@@ -15,6 +15,8 @@ Collaborators:
 
 Public API and Key Messages:
 - FkQueryResult class >> fromVerboseReply: - decode a verbose-format GRAPH.QUERY raw reply
+- FkQueryResult class >> fromCompactReply:resolvedBy:graph: - decode a compact-format GRAPH.QUERY
+  raw reply, resolving label/relationship-type/property-key ids through the given FkGraphEndpoint
 - #header - OrderedCollection of column name Strings (empty when the query had no RETURN clause)
 - #records - OrderedCollection of decoded rows, each row an OrderedCollection of decoded values
 - #statistics - OrderedCollection of statistic line Strings
@@ -24,11 +26,15 @@ Implementation Points:
   distinguishable on the wire; FalkorDB serializes boolean, double, list, map, and path values as
   plain strings containing their printed form (see FalkorDB's result-structure docs). Decoding
   those into typed Smalltalk values or an FkPath therefore isn't reliable from a verbose reply
-  alone and is deferred to compact-format decoding (--compact carries explicit value-type tags);
-  such cells are currently exposed as their raw String here.
+  alone; such cells are exposed as their raw String there.
 - Node/relationship cells are unambiguous in verbose mode (tagged nested arrays keyed by
   'id'/'labels'/'properties' or 'id'/'type'/'src_node'/'dest_node'/'properties') and are decoded
   in full, including recursively decoding their property values.
+- The compact format tags every value as a [ValueType, value] pair (see design.md Decision 7 for
+  the full code table), which removes the verbose format's ambiguity: boolean, double, array, map,
+  and path values all decode to their proper Smalltalk/FkPath representation. Compact node/
+  relationship label, type, and property-key ids are resolved to names via the FkGraphEndpoint
+  passed to #fromCompactReply:resolvedBy:graph:.
 "
 Class {
 	#name : 'FkQueryResult',
@@ -48,6 +54,89 @@ FkQueryResult class >> decodePropertiesFrom: rawPropertyPairs [
 	dict := Dictionary new.
 	rawPropertyPairs do: [ :pair | dict at: pair first put: (self decodeVerboseValue: pair second) ].
 	^ dict
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactCell: rawCell resolvedBy: anEndpoint graph: graphName [
+	^ self
+		decodeCompactValueType: rawCell first
+		raw: rawCell second
+		resolvedBy: anEndpoint
+		graph: graphName
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactMap: rawMapValue resolvedBy: anEndpoint graph: graphName [
+	| dict |
+	dict := Dictionary new.
+	1 to: rawMapValue size by: 2 do: [ :i |
+		dict
+			at: (rawMapValue at: i)
+			put: (self decodeCompactCell: (rawMapValue at: i + 1) resolvedBy: anEndpoint graph: graphName) ].
+	^ dict
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactNode: rawNode resolvedBy: anEndpoint graph: graphName [
+	| labels properties |
+	labels := rawNode second collect: [ :labelId | anEndpoint labelNameAt: labelId inGraph: graphName ].
+	properties := self decodeCompactProperties: rawNode third resolvedBy: anEndpoint graph: graphName.
+	^ FkNode id: rawNode first labels: labels properties: properties
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactPath: rawPathValue resolvedBy: anEndpoint graph: graphName [
+	^ FkPath
+		nodes: (self decodeCompactCell: rawPathValue first resolvedBy: anEndpoint graph: graphName)
+		relationships: (self decodeCompactCell: rawPathValue second resolvedBy: anEndpoint graph: graphName)
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactProperties: rawPropertyTriples resolvedBy: anEndpoint graph: graphName [
+	| dict |
+	dict := Dictionary new.
+	rawPropertyTriples do: [ :triple |
+		dict
+			at: (anEndpoint propertyKeyNameAt: triple first inGraph: graphName)
+			put: (self
+				decodeCompactValueType: triple second
+				raw: triple third
+				resolvedBy: anEndpoint
+				graph: graphName) ].
+	^ dict
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactRecord: rawRecord resolvedBy: anEndpoint graph: graphName [
+	^ rawRecord collect: [ :rawCell | self decodeCompactCell: rawCell resolvedBy: anEndpoint graph: graphName ]
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactRelationship: rawRelationship resolvedBy: anEndpoint graph: graphName [
+	| properties |
+	properties := self decodeCompactProperties: rawRelationship fifth resolvedBy: anEndpoint graph: graphName.
+	^ FkRelationship
+		id: rawRelationship first
+		type: (anEndpoint relationshipTypeNameAt: rawRelationship second inGraph: graphName)
+		startNodeId: rawRelationship third
+		endNodeId: rawRelationship fourth
+		properties: properties
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy: anEndpoint graph: graphName [
+	"See design.md Decision 7 for the full ValueType code table."
+	typeCode = 1 ifTrue: [ ^ nil ]. "VALUE_NULL"
+	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
+	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
+	typeCode = 4 ifTrue: [ ^ rawValue = 'true' ]. "VALUE_BOOLEAN"
+	typeCode = 5 ifTrue: [ ^ rawValue asNumber ]. "VALUE_DOUBLE"
+	typeCode = 6 ifTrue: [ ^ rawValue collect: [ :cell | self decodeCompactCell: cell resolvedBy: anEndpoint graph: graphName ] ]. "VALUE_ARRAY"
+	typeCode = 7 ifTrue: [ ^ self decodeCompactRelationship: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_EDGE"
+	typeCode = 8 ifTrue: [ ^ self decodeCompactNode: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_NODE"
+	typeCode = 9 ifTrue: [ ^ self decodeCompactPath: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_PATH"
+	typeCode = 10 ifTrue: [ ^ self decodeCompactMap: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_MAP"
+	^ rawValue "VALUE_UNKNOWN/VALUE_POINT/VALUE_VECTORF32: not needed by this change, left undecoded"
 ]
 
 { #category : 'private' }
@@ -89,6 +178,17 @@ FkQueryResult class >> decodeVerboseValue: rawValue [
 	- rather than a polymorphic dispatch - is what actually distinguishes them here."
 	(rawValue isKindOf: OrderedCollection) ifTrue: [ ^ self decodeVerboseGraphEntity: rawValue ].
 	^ rawValue
+]
+
+{ #category : 'instance creation' }
+FkQueryResult class >> fromCompactReply: rawReply resolvedBy: anEndpoint graph: graphName [
+	rawReply size = 1
+		ifTrue: [ ^ self new setHeader: #() records: #() statistics: rawReply first ].
+	^ self new
+		setHeader: (rawReply first collect: [ :headerCell | headerCell second ])
+		records: (rawReply second collect: [ :rawRecord |
+			self decodeCompactRecord: rawRecord resolvedBy: anEndpoint graph: graphName ])
+		statistics: rawReply third
 ]
 
 { #category : 'instance creation' }
