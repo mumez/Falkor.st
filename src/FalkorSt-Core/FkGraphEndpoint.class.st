@@ -78,14 +78,16 @@ FkGraphEndpoint >> cypherStringLiteralFor: aString [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString [
-	^ FkQueryResult fromVerboseReply: (self rawGraphQuery: graphName cypher: cypherString)
+	^ self graphQuery: graphName cypher: cypherString compact: true
 ]
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString compact: useCompact [
-	useCompact ifFalse: [ ^ self graphQuery: graphName cypher: cypherString ].
+    | rawReply |
+    rawReply := self rawGraphQuery: graphName cypher: cypherString compact: useCompact.
+	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
 	^ FkQueryResult
-		fromCompactReply: (self rawGraphQuery: graphName cypher: cypherString compact: true)
+		fromCompactReply: rawReply
 		resolvedBy: self
 		graph: graphName
 ]
@@ -143,11 +145,6 @@ FkGraphEndpoint >> propertyKeyNameAt: propertyKeyId inGraph: graphName [
 		graph: graphName
 		caches: self propKeyCaches
 		procedure: 'db.propertyKeys'
-]
-
-{ #category : 'commands-graph' }
-FkGraphEndpoint >> rawGraphQuery: graphName cypher: cypherString [
-	^ self rawGraphQuery: graphName cypher: cypherString compact: false
 ]
 
 { #category : 'commands-graph' }
