@@ -45,6 +45,7 @@ Public API and Key Messages:
   FkGraphInfoOptions passed to the block, e.g. [ :opts | opts runningQueries: true ]
 - #graphConfigGet: - query one runtime config parameter, or all of them when passed '*',
   answering the raw reply
+- #graphConfigGetAll - shortcut for #graphConfigGet: '*', answering all runtime config parameters
 - #graphConfigSet: - set one or more runtime config parameters from a Dictionary (not persisted
   across a server restart), answering the raw reply
 
@@ -108,6 +109,11 @@ FkGraphEndpoint >> executeGraphCommand: commandName graph: graphName cypher: cyp
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphConfigGet: paramName [
 	^ self unifiedCommand: { 'GRAPH.CONFIG'. 'GET'. paramName }
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConfigGetAll [
+	^ self graphConfigGet: '*'
 ]
 
 { #category : 'commands-graph' }
