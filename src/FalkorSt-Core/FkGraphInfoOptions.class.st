@@ -36,7 +36,7 @@ FkGraphInfoOptions >> asArray [
 	self runningQueries = true ifTrue: [ sections add: 'RunningQueries' ].
 	self waitingQueries = true ifTrue: [ sections add: 'WaitingQueries' ].
 	self objectPool = true ifTrue: [ sections add: 'ObjectPool' ].
-	^ sections
+	^ sections asArray
 ]
 
 { #category : 'accessing' }

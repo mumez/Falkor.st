@@ -90,6 +90,17 @@ FkGraphEndpoint >> cypherStringLiteralFor: aString [
 	^ '"' , escaped , '"'
 ]
 
+{ #category : 'private' }
+FkGraphEndpoint >> executeGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact [
+	| rawReply |
+	rawReply := self rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact.
+	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
+	^ FkQueryResult
+		fromCompactReply: rawReply
+		resolvedBy: self
+		graph: graphName
+]
+
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphDelete: graphName [
 	^ self unifiedCommand: { 'GRAPH.DELETE'. graphName }
@@ -117,13 +128,11 @@ FkGraphEndpoint >> graphQuery: graphName cypher: cypherString [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString compact: useCompact [
-	| rawReply |
-	rawReply := self rawGraphQuery: graphName cypher: cypherString compact: useCompact.
-	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
-	^ FkQueryResult
-		fromCompactReply: rawReply
-		resolvedBy: self
+	^ self
+		executeGraphCommand: 'GRAPH.QUERY'
 		graph: graphName
+		cypher: cypherString
+		compact: useCompact
 ]
 
 { #category : 'commands-graph' }
@@ -146,13 +155,11 @@ FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString compact: useCompact [
-	| rawReply |
-	rawReply := self rawGraphRoQuery: graphName cypher: cypherString compact: useCompact.
-	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
-	^ FkQueryResult
-		fromCompactReply: rawReply
-		resolvedBy: self
+	^ self
+		executeGraphCommand: 'GRAPH.RO_QUERY'
 		graph: graphName
+		cypher: cypherString
+		compact: useCompact
 ]
 
 { #category : 'commands-graph' }
@@ -186,15 +193,22 @@ FkGraphEndpoint >> nameAt: anId graph: graphName caches: cachesDict procedure: p
 		ifTrue: [ cache := self refreshCache: cachesDict graph: graphName procedure: procedureName ].
 	anId >= cache size
 		ifTrue: [
-			(RsGenericError errorMessage: ('Cannot resolve compact id {1} from {2} in graph {3}'
-				format: { anId. procedureName. graphName printString })) signal ].
+			(RsGenericError errorMessage: 'Cannot resolve compact id ' , anId printString , ' from ' , procedureName , ' in graph ' , graphName printString) signal ].
 	^ cache at: anId + 1
 ]
 
 { #category : 'private' }
 FkGraphEndpoint >> prependParams: paramsDictionary to: cypherString [
 	paramsDictionary ifEmpty: [ ^ cypherString ].
-	^ 'CYPHER {1}{2}' format: { self cypherParamsClauseFor: paramsDictionary. cypherString }
+	^ 'CYPHER ' , (self cypherParamsClauseFor: paramsDictionary) , cypherString
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact [
+	| args |
+	args := OrderedCollection with: commandName with: graphName with: cypherString.
+	useCompact ifTrue: [ args add: '--compact' ].
+	^ self unifiedCommand: args
 ]
 
 { #category : 'accessing' }
@@ -213,24 +227,18 @@ FkGraphEndpoint >> propertyKeyNameAt: propertyKeyId inGraph: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> rawGraphQuery: graphName cypher: cypherString compact: useCompact [
-	| args |
-	args := OrderedCollection with: 'GRAPH.QUERY' with: graphName with: cypherString.
-	useCompact ifTrue: [ args add: '--compact' ].
-	^ self unifiedCommand: args
+	^ self rawGraphCommand: 'GRAPH.QUERY' graph: graphName cypher: cypherString compact: useCompact
 ]
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> rawGraphRoQuery: graphName cypher: cypherString compact: useCompact [
-	| args |
-	args := OrderedCollection with: 'GRAPH.RO_QUERY' with: graphName with: cypherString.
-	useCompact ifTrue: [ args add: '--compact' ].
-	^ self unifiedCommand: args
+	^ self rawGraphCommand: 'GRAPH.RO_QUERY' graph: graphName cypher: cypherString compact: useCompact
 ]
 
 { #category : 'private' }
 FkGraphEndpoint >> refreshCache: cachesDict graph: graphName procedure: procedureName [
 	| rawReply names |
-	rawReply := self rawGraphQuery: graphName cypher: ('CALL {1}()' format: { procedureName }) compact: true.
+	rawReply := self rawGraphQuery: graphName cypher: 'CALL ' , procedureName , '()' compact: true.
 	names := (rawReply second collect: [ :rawRow | rawRow first second ]) asArray.
 	cachesDict at: graphName put: names.
 	^ names
