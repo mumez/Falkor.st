@@ -1,18 +1,18 @@
 "
 I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY,
-GRAPH.RO_QUERY, GRAPH.DELETE, and GRAPH.INFO command execution on top of RsRedisEndpoint's RESP
-transport, including FalkorDB's `CYPHER param=val ...` parameter-passing convention and the
-`--compact` result format, and decode GRAPH.QUERY/GRAPH.RO_QUERY replies into FkQueryResult (see
-FkQueryResult for the verbose/compact decoding rules). For compact decoding I also own the
-per-graph label/relationship-type/property-key id caches, since resolving those ids requires
-per-connection state that a stateless RsRedisEndpoint extension method couldn't hold.
+GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, and GRAPH.CONFIG command execution on top of
+RsRedisEndpoint's RESP transport, including FalkorDB's `CYPHER param=val ...` parameter-passing
+convention and the `--compact` result format, and decode GRAPH.QUERY/GRAPH.RO_QUERY replies into
+FkQueryResult (see FkQueryResult for the verbose/compact decoding rules). For compact decoding I
+also own the per-graph label/relationship-type/property-key id caches, since resolving those ids
+requires per-connection state that a stateless RsRedisEndpoint extension method couldn't hold.
 
 Responsibility:
 - Send GRAPH.QUERY and GRAPH.RO_QUERY commands (with or without bound parameters, verbose or
   compact) via #unifiedCommand:
-- Send GRAPH.DELETE and GRAPH.INFO commands via #unifiedCommand:, answering their raw replies
-  undecoded (GRAPH.DELETE's status string and GRAPH.INFO's ad-hoc section data are not
-  FkQueryResult-shaped)
+- Send GRAPH.DELETE, GRAPH.INFO, and GRAPH.CONFIG GET/SET commands via #unifiedCommand:, answering
+  their raw replies undecoded (GRAPH.DELETE's status string, GRAPH.INFO's ad-hoc section data, and
+  GRAPH.CONFIG's parameter list are not FkQueryResult-shaped)
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
 - Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
@@ -43,6 +43,10 @@ Public API and Key Messages:
 - #graphInfo - query server status for all GRAPH.INFO sections, answering the raw reply
 - #graphInfo: - like #graphInfo but restricted to the sections set true on the
   FkGraphInfoOptions passed to the block, e.g. [ :opts | opts runningQueries: true ]
+- #graphConfigGet: - query one runtime config parameter, or all of them when passed '*',
+  answering the raw reply
+- #graphConfigSet: - set one or more runtime config parameters from a Dictionary (not persisted
+  across a server restart), answering the raw reply
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -99,6 +103,20 @@ FkGraphEndpoint >> executeGraphCommand: commandName graph: graphName cypher: cyp
 		fromCompactReply: rawReply
 		resolvedBy: self
 		graph: graphName
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConfigGet: paramName [
+	^ self unifiedCommand: { 'GRAPH.CONFIG'. 'GET'. paramName }
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConfigSet: paramsDictionary [
+	| args |
+	args := OrderedCollection with: 'GRAPH.CONFIG' with: 'SET'.
+	paramsDictionary keysAndValuesDo: [ :key :value |
+		args add: key; add: value ].
+	^ self unifiedCommand: args
 ]
 
 { #category : 'commands-graph' }

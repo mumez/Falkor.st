@@ -1,11 +1,13 @@
 "
 I test FkGraphEndpoint's command-level behavior against a real FalkorDB instance for commands
-that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, and GRAPH.INFO.
+that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, and
+GRAPH.CONFIG.
 
 Coverage:
 - graph-ro-query spec: read-only Cypher query execution, same result-set shape as GRAPH.QUERY
 - graph-delete spec: deleting a graph answers a plain status string reply
 - graph-info spec: server status query, with and without section options
+- graph-config spec: getting one or all config parameters, and setting a runtime parameter
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -77,4 +79,27 @@ FkGraphEndpointTest >> testGraphInfoWithOptionsAnswersReply [
 	| reply |
 	reply := self endpoint graphInfo: [ :opts | opts runningQueries: true ].
 	self assert: reply notNil
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConfigGetAnswersValueForKnownParam [
+	| reply |
+	reply := self endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
+	self assert: reply notNil
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConfigGetAllAnswersNonEmptyReply [
+	| reply |
+	reply := self endpoint graphConfigGet: '*'.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConfigSetUpdatesParamValue [
+	| reply |
+	self endpoint graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: 5000; yourself).
+	reply := self endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
+	self assert: reply second equals: 5000.
+	self endpoint graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: 0; yourself)
 ]
