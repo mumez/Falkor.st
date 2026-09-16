@@ -22,8 +22,7 @@ FkCompactQueryResultTest >> testDecodesAllScalarTypes [
 	| result row |
 	result := self endpoint
 		graphQuery: self graphName
-		cypher: 'RETURN null AS n, ''hello'' AS s, 42 AS i, true AS b, 3.14 AS d, [1, 2, 3] AS l, {a: 1, b: 2} AS m'
-		compact: true.
+		cypher: 'RETURN null AS n, ''hello'' AS s, 42 AS i, true AS b, 3.14 AS d, [1, 2, 3] AS l, {a: 1, b: 2} AS m'.
 	row := result records first.
 	self assert: row first isNil.
 	self assert: row second equals: 'hello'.
@@ -39,8 +38,7 @@ FkCompactQueryResultTest >> testDecodesDoublesInScientificNotation [
 	| result row |
 	result := self endpoint
 		graphQuery: self graphName
-		cypher: 'RETURN 1e21 AS big, 1.5e300 AS huge, 1e-07 AS tiny'
-		compact: true.
+		cypher: 'RETURN 1e21 AS big, 1.5e300 AS huge, 1e-07 AS tiny'.
 	row := result records first.
 	self assert: row first equals: 1000000000000000000000.
 	self assert: row second equals: 1.5e300.
@@ -52,12 +50,10 @@ FkCompactQueryResultTest >> testDecodesPathValue [
 	| result path |
 	self endpoint
 		graphQuery: self graphName
-		cypher: 'CREATE (a:Person {name: ''A''})-[:KNOWS]->(b:Person {name: ''B''})-[:KNOWS]->(c:Person {name: ''C''})'
-		compact: true.
+		cypher: 'CREATE (a:Person {name: ''A''})-[:KNOWS]->(b:Person {name: ''B''})-[:KNOWS]->(c:Person {name: ''C''})'.
 	result := self endpoint
 		graphQuery: self graphName
-		cypher: 'MATCH p = (a:Person {name: ''A''})-[*]->(c:Person {name: ''C''}) RETURN p'
-		compact: true.
+		cypher: 'MATCH p = (a:Person {name: ''A''})-[*]->(c:Person {name: ''C''}) RETURN p'.
 	path := result records first first.
 	self assert: path class equals: FkPath.
 	self assertCollection: (path nodes collect: [ :n | n properties at: 'name' ]) asArray equals: #('A' 'B' 'C').
@@ -69,12 +65,10 @@ FkCompactQueryResultTest >> testRefreshesIdCacheOnPreviouslyUnseenLabel [
 	| firstNode secondNode |
 	firstNode := (self endpoint
 		graphQuery: self graphName
-		cypher: 'CREATE (p:Person) RETURN p'
-		compact: true) records first first.
+		cypher: 'CREATE (p:Person) RETURN p') records first first.
 	secondNode := (self endpoint
 		graphQuery: self graphName
-		cypher: 'CREATE (c:Company {name: ''Acme''}) RETURN c'
-		compact: true) records first first.
+		cypher: 'CREATE (c:Company {name: ''Acme''}) RETURN c') records first first.
 	self assertCollection: firstNode labels asArray equals: #('Person').
 	self assertCollection: secondNode labels asArray equals: #('Company')
 ]
@@ -84,8 +78,7 @@ FkCompactQueryResultTest >> testResolvesNodeLabelsAndProperties [
 	| node |
 	node := (self endpoint
 		graphQuery: self graphName
-		cypher: 'CREATE (p:Person:Employee {name: ''Alice'', age: 30}) RETURN p'
-		compact: true) records first first.
+		cypher: 'CREATE (p:Person:Employee {name: ''Alice'', age: 30}) RETURN p') records first first.
 	self assert: node class equals: FkNode.
 	self assertCollection: node labels asArray equals: #('Person' 'Employee').
 	self
@@ -98,8 +91,7 @@ FkCompactQueryResultTest >> testResolvesRelationshipType [
 	| rel |
 	rel := (self endpoint
 		graphQuery: self graphName
-		cypher: 'CREATE (a:Person)-[r:KNOWS {since: 2020}]->(b:Person) RETURN r'
-		compact: true) records first first.
+		cypher: 'CREATE (a:Person)-[r:KNOWS {since: 2020}]->(b:Person) RETURN r') records first first.
 	self assert: rel class equals: FkRelationship.
 	self assert: rel type equals: 'KNOWS'.
 	self assert: rel startNodeId equals: 0.
