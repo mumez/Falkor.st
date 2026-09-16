@@ -97,9 +97,13 @@ FkGraphEndpointTest >> testGraphConfigGetAllAnswersNonEmptyReply [
 
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphConfigSetUpdatesParamValue [
-	| reply |
-	self endpoint graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: 5000; yourself).
-	reply := self endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
-	self assert: reply second equals: 5000.
-	self endpoint graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: 0; yourself)
+	| reply originalValue |
+	originalValue := (self endpoint graphConfigGet: 'TIMEOUT_DEFAULT') second.
+	[
+		self endpoint graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: 5000; yourself).
+		reply := self endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
+		self assert: reply second equals: 5000 ]
+		ensure: [
+			self endpoint
+				graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: originalValue; yourself) ]
 ]
