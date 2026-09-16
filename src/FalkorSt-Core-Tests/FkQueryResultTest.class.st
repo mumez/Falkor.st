@@ -6,49 +6,22 @@ Coverage:
   (header/records/statistics envelope)
 - graph-query-execution spec: ""Node value"" / ""Relationship value""
 - graph-query-execution spec: ""Mixed scalar row"" - partially: null, string, and integer only.
-  Boolean, double, list, and map verbose scalars are not yet decoded to typed Smalltalk values
+  Boolean, double, list, and map verbose scalars are not decoded to typed Smalltalk values
   (FalkorDB serializes them as plain strings in verbose mode, indistinguishable from a genuine
   Cypher string on the wire - see FkQueryResult's class comment); that decoding, and Path value
-  decoding, are deferred until compact-format decoding (change section 4) supplies unambiguous
-  value-type tags.
+  decoding, are covered instead by FkCompactQueryResultTest via the compact format.
 "
 Class {
 	#name : 'FkQueryResultTest',
-	#superclass : 'TestCase',
-	#instVars : [
-		'stick',
-		'endpoint'
-	],
+	#superclass : 'FkGraphEndpointTestCase',
 	#category : 'FalkorSt-Core-Tests',
 	#package : 'FalkorSt-Core-Tests'
 }
 
-{ #category : 'private' }
-FkQueryResultTest >> graphName [
-	^ 'FkQueryResultTest_' , self selector asString
-]
-
-{ #category : 'running' }
-FkQueryResultTest >> setUp [
-	super setUp.
-	stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
-	stick connect.
-	endpoint := stick endpoint
-]
-
-{ #category : 'running' }
-FkQueryResultTest >> tearDown [
-	[ endpoint unifiedCommand: { 'GRAPH.DELETE'. self graphName } ]
-		on: Error
-		do: [ :ex |  ].
-	stick close.
-	super tearDown
-]
-
 { #category : 'tests' }
 FkQueryResultTest >> testDecodesNodeValue [
 	| result node |
-	result := endpoint
+	result := self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (p:Person:Employee {name: ''Alice'', age: 30}) RETURN p'.
 	node := result records first first.
@@ -63,7 +36,7 @@ FkQueryResultTest >> testDecodesNodeValue [
 { #category : 'tests' }
 FkQueryResultTest >> testDecodesNullStringAndIntegerScalars [
 	| result row |
-	result := endpoint
+	result := self endpoint
 		graphQuery: self graphName
 		cypher: 'RETURN null AS n, ''hello'' AS s, 42 AS i'.
 	row := result records first.
@@ -75,7 +48,7 @@ FkQueryResultTest >> testDecodesNullStringAndIntegerScalars [
 { #category : 'tests' }
 FkQueryResultTest >> testDecodesRelationshipValue [
 	| result rel |
-	result := endpoint
+	result := self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (a:Person)-[r:KNOWS {since: 2020}]->(b:Person) RETURN r'.
 	rel := result records first first.
@@ -90,7 +63,7 @@ FkQueryResultTest >> testDecodesRelationshipValue [
 { #category : 'tests' }
 FkQueryResultTest >> testQueryWithoutReturnClauseExposesOnlyStatistics [
 	| result |
-	result := endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.
+	result := self endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.
 	self assert: result header isEmpty.
 	self assert: result records isEmpty.
 	self assert: result statistics notEmpty
@@ -99,7 +72,7 @@ FkQueryResultTest >> testQueryWithoutReturnClauseExposesOnlyStatistics [
 { #category : 'tests' }
 FkQueryResultTest >> testQueryWithReturnClauseExposesHeaderRecordsAndStatistics [
 	| result |
-	result := endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
 	self assertCollection: result header asArray equals: #('a').
 	self assert: result records isEmpty.
 	self assert: result statistics notEmpty

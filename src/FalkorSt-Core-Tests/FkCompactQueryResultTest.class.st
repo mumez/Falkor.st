@@ -12,41 +12,15 @@ Coverage:
 "
 Class {
 	#name : 'FkCompactQueryResultTest',
-	#superclass : 'TestCase',
-	#instVars : [
-		'stick',
-		'endpoint'
-	],
+	#superclass : 'FkGraphEndpointTestCase',
 	#category : 'FalkorSt-Core-Tests',
 	#package : 'FalkorSt-Core-Tests'
 }
 
-{ #category : 'private' }
-FkCompactQueryResultTest >> graphName [
-	^ 'FkCompactQueryResultTest_' , self selector asString
-]
-
-{ #category : 'running' }
-FkCompactQueryResultTest >> setUp [
-	super setUp.
-	stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
-	stick connect.
-	endpoint := stick endpoint
-]
-
-{ #category : 'running' }
-FkCompactQueryResultTest >> tearDown [
-	[ endpoint unifiedCommand: { 'GRAPH.DELETE'. self graphName } ]
-		on: Error
-		do: [ :ex |  ].
-	stick close.
-	super tearDown
-]
-
 { #category : 'tests' }
 FkCompactQueryResultTest >> testDecodesAllScalarTypes [
 	| result row |
-	result := endpoint
+	result := self endpoint
 		graphQuery: self graphName
 		cypher: 'RETURN null AS n, ''hello'' AS s, 42 AS i, true AS b, 3.14 AS d, [1, 2, 3] AS l, {a: 1, b: 2} AS m'
 		compact: true.
@@ -63,11 +37,11 @@ FkCompactQueryResultTest >> testDecodesAllScalarTypes [
 { #category : 'tests' }
 FkCompactQueryResultTest >> testDecodesPathValue [
 	| result path |
-	endpoint
+	self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (a:Person {name: ''A''})-[:KNOWS]->(b:Person {name: ''B''})-[:KNOWS]->(c:Person {name: ''C''})'
 		compact: true.
-	result := endpoint
+	result := self endpoint
 		graphQuery: self graphName
 		cypher: 'MATCH p = (a:Person {name: ''A''})-[*]->(c:Person {name: ''C''}) RETURN p'
 		compact: true.
@@ -80,11 +54,11 @@ FkCompactQueryResultTest >> testDecodesPathValue [
 { #category : 'tests' }
 FkCompactQueryResultTest >> testRefreshesIdCacheOnPreviouslyUnseenLabel [
 	| firstNode secondNode |
-	firstNode := (endpoint
+	firstNode := (self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (p:Person) RETURN p'
 		compact: true) records first first.
-	secondNode := (endpoint
+	secondNode := (self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (c:Company {name: ''Acme''}) RETURN c'
 		compact: true) records first first.
@@ -95,7 +69,7 @@ FkCompactQueryResultTest >> testRefreshesIdCacheOnPreviouslyUnseenLabel [
 { #category : 'tests' }
 FkCompactQueryResultTest >> testResolvesNodeLabelsAndProperties [
 	| node |
-	node := (endpoint
+	node := (self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (p:Person:Employee {name: ''Alice'', age: 30}) RETURN p'
 		compact: true) records first first.
@@ -109,7 +83,7 @@ FkCompactQueryResultTest >> testResolvesNodeLabelsAndProperties [
 { #category : 'tests' }
 FkCompactQueryResultTest >> testResolvesRelationshipType [
 	| rel |
-	rel := (endpoint
+	rel := (self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (a:Person)-[r:KNOWS {since: 2020}]->(b:Person) RETURN r'
 		compact: true) records first first.
@@ -123,12 +97,12 @@ FkCompactQueryResultTest >> testResolvesRelationshipType [
 { #category : 'tests' }
 FkCompactQueryResultTest >> testVerboseAndCompactDecodeEquivalently [
 	| verboseResult compactResult vNode cNode |
-	endpoint
+	self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (p:Person:Employee {name: ''Alice'', age: 30})'
 		compact: true.
-	verboseResult := endpoint graphQuery: self graphName cypher: 'MATCH (p:Person) RETURN p' compact: false.
-	compactResult := endpoint graphQuery: self graphName cypher: 'MATCH (p:Person) RETURN p' compact: true.
+	verboseResult := self endpoint graphQuery: self graphName cypher: 'MATCH (p:Person) RETURN p' compact: false.
+	compactResult := self endpoint graphQuery: self graphName cypher: 'MATCH (p:Person) RETURN p' compact: true.
 	vNode := verboseResult records first first.
 	cNode := compactResult records first first.
 	self assertCollection: verboseResult header asArray equals: compactResult header asArray.
