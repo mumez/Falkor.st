@@ -225,12 +225,12 @@ FkGraphEndpoint >> propertyKeyNameAt: propertyKeyId inGraph: graphName [
 		procedure: 'db.propertyKeys'
 ]
 
-{ #category : 'commands-graph' }
+{ #category : 'private-commands-graph' }
 FkGraphEndpoint >> rawGraphQuery: graphName cypher: cypherString compact: useCompact [
 	^ self rawGraphCommand: 'GRAPH.QUERY' graph: graphName cypher: cypherString compact: useCompact
 ]
 
-{ #category : 'commands-graph' }
+{ #category : 'private-commands-graph' }
 FkGraphEndpoint >> rawGraphRoQuery: graphName cypher: cypherString compact: useCompact [
 	^ self rawGraphCommand: 'GRAPH.RO_QUERY' graph: graphName cypher: cypherString compact: useCompact
 ]
