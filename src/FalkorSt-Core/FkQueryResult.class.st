@@ -48,7 +48,7 @@ Class {
 	#package : 'FalkorSt-Core'
 }
 
-{ #category : 'private' }
+{ #category : 'private-verbose' }
 FkQueryResult class >> decodePropertiesFrom: rawPropertyPairs [
 	| dict |
 	dict := Dictionary new.
@@ -125,7 +125,7 @@ FkQueryResult class >> decodeCompactRelationship: rawRelationship resolvedBy: an
 
 { #category : 'private-compact' }
 FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy: anEndpoint graph: graphName [
-	"See design.md Decision 7 for the full ValueType code table."
+	"See falkordb-go's `ResultSetScalarTypes` enum for the full ValueType code table."
 	typeCode = 1 ifTrue: [ ^ nil ]. "VALUE_NULL"
 	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
 	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
@@ -139,7 +139,7 @@ FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy
 	^ rawValue "VALUE_UNKNOWN/VALUE_POINT/VALUE_VECTORF32: not needed by this change, left undecoded"
 ]
 
-{ #category : 'private' }
+{ #category : 'private-verbose' }
 FkQueryResult class >> decodeVerboseGraphEntity: rawEntity [
 	| secondFieldName |
 	secondFieldName := rawEntity second first.
@@ -148,7 +148,7 @@ FkQueryResult class >> decodeVerboseGraphEntity: rawEntity [
 	^ rawEntity
 ]
 
-{ #category : 'private' }
+{ #category : 'private-verbose' }
 FkQueryResult class >> decodeVerboseNode: rawNode [
 	^ FkNode
 		id: rawNode first second
@@ -156,12 +156,12 @@ FkQueryResult class >> decodeVerboseNode: rawNode [
 		properties: (self decodePropertiesFrom: rawNode third second)
 ]
 
-{ #category : 'private' }
+{ #category : 'private-verbose' }
 FkQueryResult class >> decodeVerboseRecord: rawRecord [
 	^ rawRecord collect: [ :rawValue | self decodeVerboseValue: rawValue ]
 ]
 
-{ #category : 'private' }
+{ #category : 'private-verbose' }
 FkQueryResult class >> decodeVerboseRelationship: rawRelationship [
 	^ FkRelationship
 		id: rawRelationship first second
@@ -171,7 +171,7 @@ FkQueryResult class >> decodeVerboseRelationship: rawRelationship [
 		properties: (self decodePropertiesFrom: rawRelationship fifth second)
 ]
 
-{ #category : 'private' }
+{ #category : 'private-verbose' }
 FkQueryResult class >> decodeVerboseValue: rawValue [
 	"OrderedCollection is RediStick's generic nested-RESP-array shape; a node/relationship value
 	arrives as one, while every other verbose scalar (string, integer, nil) does not, so this check

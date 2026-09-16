@@ -1,15 +1,20 @@
 "
-I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY command
-execution on top of RsRedisEndpoint's RESP transport, including FalkorDB's `CYPHER param=val ...`
-parameter-passing convention and the `--compact` result format, and decode replies into
-FkQueryResult (see FkQueryResult for the verbose/compact decoding rules). For compact decoding I
-also own the per-graph label/relationship-type/property-key id caches, since resolving those ids
-requires per-connection state that a stateless RsRedisEndpoint extension method couldn't hold.
+I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY,
+GRAPH.RO_QUERY, GRAPH.DELETE, and GRAPH.INFO command execution on top of RsRedisEndpoint's RESP
+transport, including FalkorDB's `CYPHER param=val ...` parameter-passing convention and the
+`--compact` result format, and decode GRAPH.QUERY/GRAPH.RO_QUERY replies into FkQueryResult (see
+FkQueryResult for the verbose/compact decoding rules). For compact decoding I also own the
+per-graph label/relationship-type/property-key id caches, since resolving those ids requires
+per-connection state that a stateless RsRedisEndpoint extension method couldn't hold.
 
 Responsibility:
-- Send GRAPH.QUERY commands (with or without bound parameters, verbose or compact) via #unifiedCommand:
+- Send GRAPH.QUERY and GRAPH.RO_QUERY commands (with or without bound parameters, verbose or
+  compact) via #unifiedCommand:
+- Send GRAPH.DELETE and GRAPH.INFO commands via #unifiedCommand:, answering their raw replies
+  undecoded (GRAPH.DELETE's status string and GRAPH.INFO's ad-hoc section data are not
+  FkQueryResult-shaped)
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
-- Decode the raw reply into an FkQueryResult before answering it
+- Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
   cache per graph name, refreshed on cache miss
 
@@ -19,6 +24,8 @@ Collaborators:
 - FkQueryResult: decodes the raw reply I obtain into a structured result, calling back into me
   (#labelNameAt:inGraph:, #relationshipTypeNameAt:inGraph:, #propertyKeyNameAt:inGraph:) to
   resolve compact ids
+- FkGraphInfoOptions: collects which GRAPH.INFO sections to request, evaluated against a caller's
+  block in #graphInfo:
 
 Public API and Key Messages:
 - #graphQuery:cypher: - run a verbose Cypher query, answering an FkQueryResult
@@ -29,6 +36,13 @@ Public API and Key Messages:
 - #graphQuery:cypher:params:compact: - combines both of the above
 - #rawGraphQuery:cypher: / #rawGraphQuery:cypher:compact: - like the above but answer the
   undecoded raw reply
+- #graphRoQuery:cypher: / #graphRoQuery:cypher:params: / #graphRoQuery:cypher:compact: /
+  #graphRoQuery:cypher:params:compact: / #rawGraphRoQuery:cypher:compact: - read-only counterparts
+  of the #graphQuery:cypher:* family, sending GRAPH.RO_QUERY instead of GRAPH.QUERY
+- #graphDelete: - delete an entire graph, answering the raw status string reply
+- #graphInfo - query server status for all GRAPH.INFO sections, answering the raw reply
+- #graphInfo: - like #graphInfo but restricted to the sections set true on the
+  FkGraphInfoOptions passed to the block, e.g. [ :opts | opts runningQueries: true ]
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -76,6 +90,37 @@ FkGraphEndpoint >> cypherStringLiteralFor: aString [
 	^ '"' , escaped , '"'
 ]
 
+{ #category : 'private' }
+FkGraphEndpoint >> executeGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact [
+	| rawReply |
+	rawReply := self rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact.
+	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
+	^ FkQueryResult
+		fromCompactReply: rawReply
+		resolvedBy: self
+		graph: graphName
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphDelete: graphName [
+	^ self unifiedCommand: { 'GRAPH.DELETE'. graphName }
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphInfo [
+	^ self unifiedCommand: { 'GRAPH.INFO' }
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphInfo: optionsBlock [
+	| options args |
+	options := FkGraphInfoOptions new.
+	optionsBlock value: options.
+	args := OrderedCollection with: 'GRAPH.INFO'.
+	args addAll: options asArray.
+	^ self unifiedCommand: args
+]
+
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString [
 	^ self graphQuery: graphName cypher: cypherString compact: true
@@ -83,13 +128,11 @@ FkGraphEndpoint >> graphQuery: graphName cypher: cypherString [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString compact: useCompact [
-    | rawReply |
-    rawReply := self rawGraphQuery: graphName cypher: cypherString compact: useCompact.
-	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
-	^ FkQueryResult
-		fromCompactReply: rawReply
-		resolvedBy: self
+	^ self
+		executeGraphCommand: 'GRAPH.QUERY'
 		graph: graphName
+		cypher: cypherString
+		compact: useCompact
 ]
 
 { #category : 'commands-graph' }
@@ -101,6 +144,33 @@ FkGraphEndpoint >> graphQuery: graphName cypher: cypherString params: paramsDict
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString params: paramsDictionary compact: useCompact [
 	^ self
 		graphQuery: graphName
+		cypher: (self prependParams: paramsDictionary to: cypherString)
+		compact: useCompact
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString [
+	^ self graphRoQuery: graphName cypher: cypherString compact: true
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString compact: useCompact [
+	^ self
+		executeGraphCommand: 'GRAPH.RO_QUERY'
+		graph: graphName
+		cypher: cypherString
+		compact: useCompact
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString params: paramsDictionary [
+	^ self graphRoQuery: graphName cypher: (self prependParams: paramsDictionary to: cypherString)
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString params: paramsDictionary compact: useCompact [
+	^ self
+		graphRoQuery: graphName
 		cypher: (self prependParams: paramsDictionary to: cypherString)
 		compact: useCompact
 ]
@@ -133,6 +203,14 @@ FkGraphEndpoint >> prependParams: paramsDictionary to: cypherString [
 	^ 'CYPHER ' , (self cypherParamsClauseFor: paramsDictionary) , cypherString
 ]
 
+{ #category : 'private' }
+FkGraphEndpoint >> rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact [
+	| args |
+	args := OrderedCollection with: commandName with: graphName with: cypherString.
+	useCompact ifTrue: [ args add: '--compact' ].
+	^ self unifiedCommand: args
+]
+
 { #category : 'accessing' }
 FkGraphEndpoint >> propKeyCaches [
 	^ propKeyCaches ifNil: [ propKeyCaches := Dictionary new ]
@@ -147,12 +225,14 @@ FkGraphEndpoint >> propertyKeyNameAt: propertyKeyId inGraph: graphName [
 		procedure: 'db.propertyKeys'
 ]
 
-{ #category : 'commands-graph' }
+{ #category : 'private-commands-graph' }
 FkGraphEndpoint >> rawGraphQuery: graphName cypher: cypherString compact: useCompact [
-	| args |
-	args := OrderedCollection with: 'GRAPH.QUERY' with: graphName with: cypherString.
-	useCompact ifTrue: [ args add: '--compact' ].
-	^ self unifiedCommand: args
+	^ self rawGraphCommand: 'GRAPH.QUERY' graph: graphName cypher: cypherString compact: useCompact
+]
+
+{ #category : 'private-commands-graph' }
+FkGraphEndpoint >> rawGraphRoQuery: graphName cypher: cypherString compact: useCompact [
+	^ self rawGraphCommand: 'GRAPH.RO_QUERY' graph: graphName cypher: cypherString compact: useCompact
 ]
 
 { #category : 'private' }
