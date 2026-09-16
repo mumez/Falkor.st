@@ -125,7 +125,7 @@ FkQueryResult class >> decodeCompactRelationship: rawRelationship resolvedBy: an
 
 { #category : 'private-compact' }
 FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy: anEndpoint graph: graphName [
-	"See design.md Decision 7 for the full ValueType code table."
+	"See falkordb-go's `ResultSetScalarTypes` enum for the full ValueType code table."
 	typeCode = 1 ifTrue: [ ^ nil ]. "VALUE_NULL"
 	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
 	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
