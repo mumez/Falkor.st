@@ -130,7 +130,7 @@ FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy
 	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
 	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
 	typeCode = 4 ifTrue: [ ^ rawValue = 'true' ]. "VALUE_BOOLEAN"
-	typeCode = 5 ifTrue: [ ^ rawValue asNumber ]. "VALUE_DOUBLE"
+	typeCode = 5 ifTrue: [ ^ (rawValue copyReplaceAll: 'e+' with: 'e') asNumber ]. "VALUE_DOUBLE"
 	typeCode = 6 ifTrue: [ ^ rawValue collect: [ :cell | self decodeCompactCell: cell resolvedBy: anEndpoint graph: graphName ] ]. "VALUE_ARRAY"
 	typeCode = 7 ifTrue: [ ^ self decodeCompactRelationship: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_EDGE"
 	typeCode = 8 ifTrue: [ ^ self decodeCompactNode: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_NODE"

@@ -35,6 +35,19 @@ FkCompactQueryResultTest >> testDecodesAllScalarTypes [
 ]
 
 { #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesDoublesInScientificNotation [
+	| result row |
+	result := self endpoint
+		graphQuery: self graphName
+		cypher: 'RETURN 1e21 AS big, 1.5e300 AS huge, 1e-07 AS tiny'
+		compact: true.
+	row := result records first.
+	self assert: row first equals: 1000000000000000000000.
+	self assert: row second equals: 1.5e300.
+	self assert: row third equals: 1.0e-7
+]
+
+{ #category : 'tests' }
 FkCompactQueryResultTest >> testDecodesPathValue [
 	| result path |
 	self endpoint
@@ -92,6 +105,15 @@ FkCompactQueryResultTest >> testResolvesRelationshipType [
 	self assert: rel startNodeId equals: 0.
 	self assert: rel endNodeId equals: 1.
 	self assert: rel properties equals: (Dictionary new at: 'since' put: 2020; yourself)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testRaisesErrorForUnresolvableCompactId [
+	"Simulate a stale id (id past the schema's current size, as after a concurrent schema shrink)."
+	| endpoint |
+	endpoint := self endpoint.
+	endpoint labelCaches at: self graphName put: #('Person').
+	self should: [ endpoint labelNameAt: 9999 inGraph: self graphName ] raise: RsGenericError
 ]
 
 { #category : 'tests' }

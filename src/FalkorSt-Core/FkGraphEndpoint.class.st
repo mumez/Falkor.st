@@ -119,6 +119,9 @@ FkGraphEndpoint >> nameAt: anId graph: graphName caches: cachesDict procedure: p
 	cache := cachesDict at: graphName ifAbsent: [ nil ].
 	(cache isNil or: [ anId >= cache size ])
 		ifTrue: [ cache := self refreshCache: cachesDict graph: graphName procedure: procedureName ].
+	anId >= cache size
+		ifTrue: [
+			(RsGenericError errorMessage: 'Cannot resolve compact id ' , anId printString , ' from ' , procedureName , ' in graph ' , graphName printString) signal ].
 	^ cache at: anId + 1
 ]
 
