@@ -1,4 +1,4 @@
-# falkor.st
+# Falkor.st
 
 [![smalltalkCI](https://github.com/mumez/falkor.st/actions/workflows/main.yml/badge.svg)](https://github.com/mumez/falkor.st/actions/workflows/main.yml)
 

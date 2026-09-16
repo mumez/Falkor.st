@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-falkor.st is a Pharo client for [FalkorDB](https://github.com/FalkorDB/falkordb), built on top of
+Falkor.st is a Pharo client for [FalkorDB](https://github.com/FalkorDB/falkordb), built on top of
 [RediStick](https://github.com/mumez/RediStick) (Redis client, local clone `../RediStick`) and
 [SCypher](https://github.com/mumez/SCypher) (Cypher query builder, local clone `../SCypher`). FalkorDB is a
 Redis module that interprets Cypher, so falkor.st talks to it as a Redis extension rather than a separate
