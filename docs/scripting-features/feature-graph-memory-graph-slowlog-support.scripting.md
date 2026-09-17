@@ -68,3 +68,15 @@ Paste the script above into a Pharo Playground, or ask the assistant to run it v
 `forkRunThen:onTimeout:` runs the orchestration in the background and returns immediately — watch
 for the completion block's own report (e.g. via Transcript), the `onTimeout:` block's report if a
 step stalls, or check progress with `AbOrchestrationManager default orchestrationAt: <orchestration script id>`.
+
+## Post-review note
+
+The implement-phase prompt below (written before the run) speculated that GRAPH.SLOWLOG's raw
+entry might have only 4 fields, contradicting FalkorDB's own docs, and told the agent to verify
+against the live server rather than assume. That verification was re-run manually after PR review
+(against the same `sync://localhost:6379` FalkorDB instance this repo's tests target): the raw
+reply is consistently 5 elements — timestamp, command, query, execution time ms, and a
+CYPHER-prefix parameters string that is `nil` when the query had no bound parameters. The shipped
+`FkSlowLogEntry`/`#slowLogEntryFrom:` implementation (5 fields, including `parameters`) matches
+this verified reality; the prompt text itself was not updated after the fact and should be read as
+a historical record of what was asked, not a corrected spec.

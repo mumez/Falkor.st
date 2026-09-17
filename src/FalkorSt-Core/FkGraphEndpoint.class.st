@@ -87,6 +87,10 @@ Implementation Points:
 - Id caches are Dictionaries of graphName -> Array of names, indexed by id (0-based); a lookup
   past the end of the cached array triggers one refresh via CALL db.labels()/relationshipTypes()/
   propertyKeys() before resolving (see design.md Decision 4)
+- GRAPH.SLOWLOG's raw entry is always 5 elements on the FalkorDB versions this was verified
+  against (timestamp, command, query, execution time ms, CYPHER-prefix parameters string or nil);
+  #slowLogEntryFrom: relies on that fixed shape and normalizes the timestamp/execution-time
+  strings to Numbers before building the FkSlowLogEntry
 "
 Class {
 	#name : 'FkGraphEndpoint',
@@ -248,13 +252,21 @@ FkGraphEndpoint >> graphList [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphMemoryUsage: graphName [
-	^ self dictionaryFromFlatPairs: (self unifiedCommand: { 'GRAPH.MEMORY'. 'USAGE'. graphName })
+	^ self dictionaryFromFlatPairs: (self unifiedCommand: (self graphMemoryUsageArgsFor: graphName samples: nil))
 ]
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphMemoryUsage: graphName samples: sampleCount [
 	^ self dictionaryFromFlatPairs:
-		(self unifiedCommand: { 'GRAPH.MEMORY'. 'USAGE'. graphName. 'SAMPLES'. sampleCount })
+		(self unifiedCommand: (self graphMemoryUsageArgsFor: graphName samples: sampleCount))
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> graphMemoryUsageArgsFor: graphName samples: sampleCountOrNil [
+	| args |
+	args := OrderedCollection with: 'GRAPH.MEMORY' with: 'USAGE' with: graphName.
+	sampleCountOrNil ifNotNil: [ args add: 'SAMPLES'; add: sampleCountOrNil ].
+	^ args
 ]
 
 { #category : 'commands-graph' }
@@ -399,10 +411,10 @@ FkGraphEndpoint >> refreshCache: cachesDict graph: graphName procedure: procedur
 { #category : 'private' }
 FkGraphEndpoint >> slowLogEntryFrom: rawEntry [
 	^ FkSlowLogEntry
-		timestamp: rawEntry first
+		timestamp: rawEntry first asNumber
 		command: rawEntry second
 		query: rawEntry third
-		executionTimeMs: rawEntry fourth
+		executionTimeMs: rawEntry fourth asNumber
 		parameters: rawEntry fifth
 ]
 

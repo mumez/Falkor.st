@@ -267,8 +267,23 @@ FkGraphEndpointTest >> testGraphSlowLogAnswersEntriesForSlowQuery [
 	self assert: entry class equals: FkSlowLogEntry.
 	self assert: entry command equals: 'GRAPH.QUERY'.
 	self assert: entry query equals: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
-	self assert: entry executionTimeMs asNumber > 0.
-	self assert: entry timestamp notNil
+	self assert: entry executionTimeMs > 0.
+	self assert: entry timestamp notNil.
+	self assert: entry parameters isNil
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphSlowLogDecodesParametersWhenQueryWasBoundWithThem [
+	| reply entry |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'UNWIND range(1, $n) AS x RETURN sum(x)'
+		params: (Dictionary new at: 'n' put: 200000; yourself).
+	reply := self endpoint graphSlowLog: self graphName.
+	self deny: reply isEmpty.
+	entry := reply first.
+	self assert: entry parameters notNil.
+	self assert: (entry parameters includesSubstring: 'n=200000')
 ]
 
 { #category : 'tests' }
