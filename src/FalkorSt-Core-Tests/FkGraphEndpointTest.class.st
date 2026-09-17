@@ -134,19 +134,12 @@ FkGraphEndpointTest >> dropConstraintType: constraintType entityType: entityType
 FkGraphEndpointTest >> testGraphConstraintCreateMandatoryOnNodeSucceeds [
 	| reply |
 	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
-	[
-		reply := self
-			createConstraintType: 'MANDATORY'
-			entityType: 'NODE'
-			entityName: 'Person'
-			properties: #('name').
-		self assert: reply equals: 'PENDING' ]
-		ensure: [
-			self
-				dropConstraintType: 'MANDATORY'
-				entityType: 'NODE'
-				entityName: 'Person'
-				properties: #('name') ]
+	reply := self
+		createConstraintType: 'MANDATORY'
+		entityType: 'NODE'
+		entityName: 'Person'
+		properties: #('name').
+	self assert: reply equals: 'PENDING'
 ]
 
 { #category : 'tests' }
@@ -154,10 +147,8 @@ FkGraphEndpointTest >> testGraphConstraintCreateUniqueOnNodeSucceeds [
 	| reply |
 	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {email: ''alice@example.com''})'.
 	self endpoint graphQuery: self graphName cypher: 'CREATE INDEX FOR (n:Person) ON (n.email)'.
-	[
-		reply := self createConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email').
-		self assert: reply equals: 'PENDING' ]
-		ensure: [ self dropConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email') ]
+	reply := self createConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email').
+	self assert: reply equals: 'PENDING'
 ]
 
 { #category : 'tests' }
