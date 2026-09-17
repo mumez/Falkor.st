@@ -1,7 +1,7 @@
 "
 I test FkGraphEndpoint's command-level behavior against a real FalkorDB instance for commands
 that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO,
-GRAPH.CONFIG, and GRAPH.CONSTRAINT.
+GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, and GRAPH.PROFILE.
 
 Coverage:
 - graph-ro-query spec: read-only Cypher query execution, same result-set shape as GRAPH.QUERY
@@ -10,6 +10,10 @@ Coverage:
 - graph-config spec: getting one or all config parameters, and setting a runtime parameter
 - graph-constraint spec: creating and dropping MANDATORY/UNIQUE constraints on node labels and
   relationship types
+- graph-explain spec: constructing a query plan without executing it, with and without bound
+  parameters, answering the raw undecoded plan reply
+- graph-profile spec: executing a query and answering the raw undecoded plan reply augmented with
+  per-operation metrics, with and without bound parameters
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -162,6 +166,44 @@ FkGraphEndpointTest >> testGraphConstraintDropRemovesConstraint [
 		entityName: 'Person'
 		properties: #('name').
 	self assert: reply equals: 'OK'
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphExplainAnswersNonEmptyPlan [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint graphExplain: self graphName cypher: 'MATCH (p:Person) RETURN p'.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphExplainWithParamsAnswersNonEmptyPlan [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint
+		graphExplain: self graphName
+		cypher: 'MATCH (p:Person {name: $name}) RETURN p'
+		params: (Dictionary new at: 'name' put: 'Alice'; yourself).
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphProfileAnswersNonEmptyReply [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint graphProfile: self graphName cypher: 'MATCH (p:Person) RETURN p'.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphProfileWithParamsAnswersNonEmptyReply [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint
+		graphProfile: self graphName
+		cypher: 'MATCH (p:Person {name: $name}) RETURN p'
+		params: (Dictionary new at: 'name' put: 'Alice'; yourself).
+	self deny: reply isEmpty
 ]
 
 { #category : 'tests' }

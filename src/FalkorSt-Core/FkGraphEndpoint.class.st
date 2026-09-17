@@ -1,7 +1,8 @@
 "
 I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY,
-GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG, and GRAPH.CONSTRAINT command execution on
-top of RsRedisEndpoint's RESP transport, including FalkorDB's `CYPHER param=val ...`
+GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, and
+GRAPH.PROFILE command execution on top of RsRedisEndpoint's RESP transport, including FalkorDB's
+`CYPHER param=val ...`
 parameter-passing convention and the `--compact` result format, and decode GRAPH.QUERY/
 GRAPH.RO_QUERY replies into FkQueryResult (see FkQueryResult for the verbose/compact decoding
 rules). For compact decoding I also own the per-graph label/relationship-type/property-key id
@@ -11,10 +12,11 @@ extension method couldn't hold.
 Responsibility:
 - Send GRAPH.QUERY and GRAPH.RO_QUERY commands (with or without bound parameters, verbose or
   compact) via #unifiedCommand:
-- Send GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG GET/SET, and GRAPH.CONSTRAINT CREATE/DROP commands
-  via #unifiedCommand:, answering their raw replies undecoded (GRAPH.DELETE's status string,
-  GRAPH.INFO's ad-hoc section data, GRAPH.CONFIG's parameter list, and GRAPH.CONSTRAINT's
-  PENDING/OK status string are not FkQueryResult-shaped)
+- Send GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG GET/SET, GRAPH.CONSTRAINT CREATE/DROP, GRAPH.EXPLAIN,
+  and GRAPH.PROFILE commands via #unifiedCommand:, answering their raw replies undecoded
+  (GRAPH.DELETE's status string, GRAPH.INFO's ad-hoc section data, GRAPH.CONFIG's parameter list,
+  GRAPH.CONSTRAINT's PENDING/OK status string, and GRAPH.EXPLAIN/GRAPH.PROFILE's plain-text plan
+  are not FkQueryResult-shaped)
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
 - Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
@@ -54,6 +56,14 @@ Public API and Key Messages:
   schema constraint on a NODE label or RELATIONSHIP type's properties, answering the raw reply
 - #graphConstraintDrop:type:entityType:entityName:properties: - remove a previously created
   constraint, same argument shape as #graphConstraintCreate:type:entityType:entityName:properties:
+- #graphExplain:cypher: - construct a query execution plan without running it, answering the raw
+  plan reply
+- #graphExplain:cypher:params: - like #graphExplain:cypher: with named parameters bound via the
+  CYPHER prefix convention
+- #graphProfile:cypher: - execute a query and answer the raw reply representing its execution
+  plan augmented with per-operation metrics
+- #graphProfile:cypher:params: - like #graphProfile:cypher: with named parameters bound via the
+  CYPHER prefix convention
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -179,6 +189,16 @@ FkGraphEndpoint >> graphDelete: graphName [
 ]
 
 { #category : 'commands-graph' }
+FkGraphEndpoint >> graphExplain: graphName cypher: cypherString [
+	^ self unifiedCommand: { 'GRAPH.EXPLAIN'. graphName. cypherString }
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphExplain: graphName cypher: cypherString params: paramsDictionary [
+	^ self graphExplain: graphName cypher: (self prependParams: paramsDictionary to: cypherString)
+]
+
+{ #category : 'commands-graph' }
 FkGraphEndpoint >> graphInfo [
 	^ self unifiedCommand: { 'GRAPH.INFO' }
 ]
@@ -191,6 +211,16 @@ FkGraphEndpoint >> graphInfo: optionsBlock [
 	args := OrderedCollection with: 'GRAPH.INFO'.
 	args addAll: options asArray.
 	^ self unifiedCommand: args
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphProfile: graphName cypher: cypherString [
+	^ self unifiedCommand: { 'GRAPH.PROFILE'. graphName. cypherString }
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphProfile: graphName cypher: cypherString params: paramsDictionary [
+	^ self graphProfile: graphName cypher: (self prependParams: paramsDictionary to: cypherString)
 ]
 
 { #category : 'commands-graph' }
