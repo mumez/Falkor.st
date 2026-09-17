@@ -1,7 +1,7 @@
 "
 I test FkGraphEndpoint's command-level behavior against a real FalkorDB instance for commands
 that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO,
-GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, and GRAPH.PROFILE.
+GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, GRAPH.PROFILE, GRAPH.LIST, and GRAPH.COPY.
 
 Coverage:
 - graph-ro-query spec: read-only Cypher query execution, same result-set shape as GRAPH.QUERY
@@ -14,6 +14,8 @@ Coverage:
   parameters, answering the raw undecoded plan reply
 - graph-profile spec: executing a query and answering the raw undecoded plan reply augmented with
   per-operation metrics, with and without bound parameters
+- graph-list spec: listing graph names present in the keyspace
+- graph-copy spec: copying a graph's data into a new graph name
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -204,6 +206,35 @@ FkGraphEndpointTest >> testGraphProfileWithParamsAnswersNonEmptyReply [
 		cypher: 'MATCH (p:Person {name: $name}) RETURN p'
 		params: (Dictionary new at: 'name' put: 'Alice'; yourself).
 	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphListIncludesCreatedGraph [
+	| listGraphName reply |
+	listGraphName := self graphName , '_list'.
+	[
+		self endpoint graphQuery: listGraphName cypher: 'CREATE (:Person)'.
+		reply := self endpoint graphList.
+		self assert: (reply includes: listGraphName) ]
+		ensure: [
+			[ self endpoint graphDelete: listGraphName ] on: Error do: [ :ex |  ] ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphCopyCopiesGraphData [
+	| srcGraphName destGraphName reply result |
+	srcGraphName := self graphName , '_copySrc'.
+	destGraphName := self graphName , '_copyDest'.
+	[
+		self endpoint graphQuery: srcGraphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+		self endpoint graphCopy: srcGraphName to: destGraphName.
+		reply := self endpoint graphList.
+		self assert: (reply includes: destGraphName).
+		result := self endpoint graphQuery: destGraphName cypher: 'MATCH (p:Person) RETURN p.name'.
+		self assert: result records first first equals: 'Alice' ]
+		ensure: [
+			[ self endpoint graphDelete: srcGraphName ] on: Error do: [ :ex |  ].
+			[ self endpoint graphDelete: destGraphName ] on: Error do: [ :ex |  ] ]
 ]
 
 { #category : 'tests' }
