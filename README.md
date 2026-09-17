@@ -15,6 +15,29 @@ Metacello new
   load.
 ```
 
+## Basic Usage
+
+```smalltalk
+stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
+stick connect.
+
+result := stick endpoint graphQuery: 'social' cypher: 'CREATE (p:Person {name: ''Alice''}) RETURN p'.
+node := result records first first.
+node properties at: #name. "'Alice'"
+
+stick close.
+```
+
+`graphQuery:cypher:` runs `GRAPH.QUERY` and decodes the reply (compact format by default) into an
+`FkQueryResult`, whose `records` are rows of decoded values (`FkNode`, `FkRelationship`, `FkPath`, or
+native scalars). See `FkGraphEndpoint` for the full command set (`GRAPH.RO_QUERY`, `GRAPH.DELETE`,
+`GRAPH.INFO`, `GRAPH.CONFIG`, `GRAPH.CONSTRAINT CREATE`/`DROP`, `GRAPH.EXPLAIN`, `GRAPH.PROFILE`,
+`GRAPH.LIST`, `GRAPH.COPY`, `GRAPH.MEMORY`, `GRAPH.SLOWLOG`, and more).
+
 ## Status
 
-Early development. `GRAPH.QUERY` and `GRAPH.RO_QUERY` execution and result decoding (verbose and compact formats), plus `GRAPH.DELETE`, `GRAPH.INFO`, `GRAPH.CONFIG GET`/`GRAPH.CONFIG SET`, `GRAPH.CONSTRAINT CREATE`/`GRAPH.CONSTRAINT DROP`, `GRAPH.EXPLAIN`, `GRAPH.PROFILE`, `GRAPH.LIST`, and `GRAPH.COPY`, are implemented so far.
+Commands are implemented, except for administrative ACL commands.
+
+## Roadmap
+
+A high-level object-graph API, modeled on [SCypherGraph's `SgGraphDb`](https://github.com/mumez/SCypherGraph#examples), is planned on top of the current command layer.
