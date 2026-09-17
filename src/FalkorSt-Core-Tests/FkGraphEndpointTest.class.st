@@ -141,6 +141,18 @@ FkGraphEndpointTest >> dropConstraintType: constraintType entityType: entityType
 		properties: propertiesCollection
 ]
 
+{ #category : 'private' }
+FkGraphEndpointTest >> dropConstraintIgnoringErrorsType: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	[
+		self
+			dropConstraintType: constraintType
+			entityType: entityType
+			entityName: entityName
+			properties: propertiesCollection ]
+		on: Error
+		do: [ :ex |  ]
+]
+
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphConstraintCreateMandatoryOnNodeSucceeds [
 	| reply |
@@ -350,8 +362,10 @@ FkGraphEndpointTest >> testGraphConstraintDropWithRemovesConstraint [
 	self createConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name').
 	constraint := FkGraphConstraint new.
 	constraint mandatory; node: 'Person'; props: #('name').
-	reply := self endpoint graphConstraintDropWith: constraint on: self graphName.
-	self assert: reply equals: 'OK'
+	[
+		reply := self endpoint graphConstraintDropWith: constraint on: self graphName.
+		self assert: reply equals: 'OK' ]
+		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
 ]
 
 { #category : 'tests' }
@@ -359,10 +373,12 @@ FkGraphEndpointTest >> testGraphConstraintDropBySucceeds [
 	| reply |
 	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
 	self createConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name').
-	reply := self endpoint
-		graphConstraintDropBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]
-		on: self graphName.
-	self assert: reply equals: 'OK'
+	[
+		reply := self endpoint
+			graphConstraintDropBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]
+			on: self graphName.
+		self assert: reply equals: 'OK' ]
+		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
 ]
 
 { #category : 'tests' }
