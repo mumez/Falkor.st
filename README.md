@@ -17,4 +17,4 @@ Metacello new
 
 ## Status
 
-Early development. `GRAPH.QUERY` and `GRAPH.RO_QUERY` execution and result decoding (verbose and compact formats), plus `GRAPH.DELETE`, `GRAPH.INFO`, `GRAPH.CONFIG GET`/`GRAPH.CONFIG SET`, `GRAPH.CONSTRAINT CREATE`/`GRAPH.CONSTRAINT DROP`, `GRAPH.EXPLAIN`, and `GRAPH.PROFILE`, are implemented so far.
+Early development. `GRAPH.QUERY` and `GRAPH.RO_QUERY` execution and result decoding (verbose and compact formats), plus `GRAPH.DELETE`, `GRAPH.INFO`, `GRAPH.CONFIG GET`/`GRAPH.CONFIG SET`, `GRAPH.CONSTRAINT CREATE`/`GRAPH.CONSTRAINT DROP`, `GRAPH.EXPLAIN`, `GRAPH.PROFILE`, `GRAPH.LIST`, and `GRAPH.COPY`, are implemented so far.

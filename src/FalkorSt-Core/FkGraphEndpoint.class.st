@@ -1,7 +1,8 @@
 "
 I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY,
-GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, and
-GRAPH.PROFILE command execution on top of RsRedisEndpoint's RESP transport, including FalkorDB's
+GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN,
+GRAPH.PROFILE, GRAPH.LIST, and GRAPH.COPY command execution on top of RsRedisEndpoint's RESP
+transport, including FalkorDB's
 `CYPHER param=val ...`
 parameter-passing convention and the `--compact` result format, and decode GRAPH.QUERY/
 GRAPH.RO_QUERY replies into FkQueryResult (see FkQueryResult for the verbose/compact decoding
@@ -13,10 +14,11 @@ Responsibility:
 - Send GRAPH.QUERY and GRAPH.RO_QUERY commands (with or without bound parameters, verbose or
   compact) via #unifiedCommand:
 - Send GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG GET/SET, GRAPH.CONSTRAINT CREATE/DROP, GRAPH.EXPLAIN,
-  and GRAPH.PROFILE commands via #unifiedCommand:, answering their raw replies undecoded
-  (GRAPH.DELETE's status string, GRAPH.INFO's ad-hoc section data, GRAPH.CONFIG's parameter list,
-  GRAPH.CONSTRAINT's PENDING/OK status string, and GRAPH.EXPLAIN/GRAPH.PROFILE's plain-text plan
-  are not FkQueryResult-shaped)
+  GRAPH.PROFILE, GRAPH.LIST, and GRAPH.COPY commands via #unifiedCommand:, answering their raw
+  replies undecoded (GRAPH.DELETE's status string, GRAPH.INFO's ad-hoc section data,
+  GRAPH.CONFIG's parameter list, GRAPH.CONSTRAINT's PENDING/OK status string,
+  GRAPH.EXPLAIN/GRAPH.PROFILE's plain-text plan, GRAPH.LIST's array of graph names, and
+  GRAPH.COPY's status string are not FkQueryResult-shaped)
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
 - Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
@@ -64,6 +66,9 @@ Public API and Key Messages:
   plan augmented with per-operation metrics
 - #graphProfile:cypher:params: - like #graphProfile:cypher: with named parameters bound via the
   CYPHER prefix convention
+- #graphList - list all graph names currently present in the keyspace, answering the raw reply
+- #graphCopy:to: - duplicate the graph named by the first argument into a new graph named by the
+  second argument, answering the raw reply
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -184,6 +189,11 @@ FkGraphEndpoint >> graphConstraintDrop: graphName type: constraintType entityTyp
 ]
 
 { #category : 'commands-graph' }
+FkGraphEndpoint >> graphCopy: srcGraphName to: destGraphName [
+	^ self unifiedCommand: { 'GRAPH.COPY'. srcGraphName. destGraphName }
+]
+
+{ #category : 'commands-graph' }
 FkGraphEndpoint >> graphDelete: graphName [
 	^ self unifiedCommand: { 'GRAPH.DELETE'. graphName }
 ]
@@ -211,6 +221,11 @@ FkGraphEndpoint >> graphInfo: optionsBlock [
 	args := OrderedCollection with: 'GRAPH.INFO'.
 	args addAll: options asArray.
 	^ self unifiedCommand: args
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphList [
+	^ self unifiedCommand: { 'GRAPH.LIST' }
 ]
 
 { #category : 'commands-graph' }
