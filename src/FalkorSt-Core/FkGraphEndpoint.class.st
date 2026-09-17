@@ -1,8 +1,8 @@
 "
 I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY,
 GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN,
-GRAPH.PROFILE, GRAPH.LIST, and GRAPH.COPY command execution on top of RsRedisEndpoint's RESP
-transport, including FalkorDB's
+GRAPH.PROFILE, GRAPH.LIST, GRAPH.COPY, GRAPH.MEMORY, and GRAPH.SLOWLOG command execution on top of
+RsRedisEndpoint's RESP transport, including FalkorDB's
 `CYPHER param=val ...`
 parameter-passing convention and the `--compact` result format, and decode GRAPH.QUERY/
 GRAPH.RO_QUERY replies into FkQueryResult (see FkQueryResult for the verbose/compact decoding
@@ -19,6 +19,8 @@ Responsibility:
   GRAPH.CONFIG's parameter list, GRAPH.CONSTRAINT's PENDING/OK status string,
   GRAPH.EXPLAIN/GRAPH.PROFILE's plain-text plan, GRAPH.LIST's array of graph names, and
   GRAPH.COPY's status string are not FkQueryResult-shaped)
+- Send GRAPH.MEMORY USAGE and GRAPH.SLOWLOG commands via #unifiedCommand:, decoding their flat/
+  nested raw replies into a usable Dictionary and OrderedCollection of FkSlowLogEntry respectively
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
 - Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
@@ -32,6 +34,7 @@ Collaborators:
   resolve compact ids
 - FkGraphInfoOptions: collects which GRAPH.INFO sections to request, evaluated against a caller's
   block in #graphInfo:
+- FkSlowLogEntry: the decoded value object I build one per raw GRAPH.SLOWLOG entry in #graphSlowLog:
 
 Public API and Key Messages:
 - #graphQuery:cypher: - run a verbose Cypher query, answering an FkQueryResult
@@ -69,6 +72,12 @@ Public API and Key Messages:
 - #graphList - list all graph names currently present in the keyspace, answering the raw reply
 - #graphCopy:to: - duplicate the graph named by the first argument into a new graph named by the
   second argument, answering the raw reply
+- #graphMemoryUsage: - report memory usage statistics for a graph, decoding the flat key/value
+  reply into a Dictionary
+- #graphMemoryUsage:samples: - like #graphMemoryUsage: but requests a specific sample count for
+  the estimation
+- #graphSlowLog: - report the graph's slowest queries (up to 10), decoding each raw entry into an
+  FkSlowLogEntry and answering an OrderedCollection of them
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -128,6 +137,15 @@ FkGraphEndpoint >> cypherStringLiteralFor: aString [
 	| escaped |
 	escaped := (aString copyReplaceAll: '\' with: '\\') copyReplaceAll: '"' with: '\"'.
 	^ '"' , escaped , '"'
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> dictionaryFromFlatPairs: flatCollection [
+	| result |
+	result := Dictionary new.
+	1 to: flatCollection size by: 2 do: [ :i |
+		result at: (flatCollection at: i) put: (flatCollection at: i + 1) ].
+	^ result
 ]
 
 { #category : 'private' }
@@ -229,6 +247,17 @@ FkGraphEndpoint >> graphList [
 ]
 
 { #category : 'commands-graph' }
+FkGraphEndpoint >> graphMemoryUsage: graphName [
+	^ self dictionaryFromFlatPairs: (self unifiedCommand: { 'GRAPH.MEMORY'. 'USAGE'. graphName })
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphMemoryUsage: graphName samples: sampleCount [
+	^ self dictionaryFromFlatPairs:
+		(self unifiedCommand: { 'GRAPH.MEMORY'. 'USAGE'. graphName. 'SAMPLES'. sampleCount })
+]
+
+{ #category : 'commands-graph' }
 FkGraphEndpoint >> graphProfile: graphName cypher: cypherString [
 	^ self unifiedCommand: { 'GRAPH.PROFILE'. graphName. cypherString }
 ]
@@ -236,6 +265,12 @@ FkGraphEndpoint >> graphProfile: graphName cypher: cypherString [
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphProfile: graphName cypher: cypherString params: paramsDictionary [
 	^ self graphProfile: graphName cypher: (self prependParams: paramsDictionary to: cypherString)
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphSlowLog: graphName [
+	^ (self unifiedCommand: { 'GRAPH.SLOWLOG'. graphName })
+		collect: [ :rawEntry | self slowLogEntryFrom: rawEntry ]
 ]
 
 { #category : 'commands-graph' }
@@ -359,6 +394,16 @@ FkGraphEndpoint >> refreshCache: cachesDict graph: graphName procedure: procedur
 	names := (rawReply second collect: [ :rawRow | rawRow first second ]) asArray.
 	cachesDict at: graphName put: names.
 	^ names
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> slowLogEntryFrom: rawEntry [
+	^ FkSlowLogEntry
+		timestamp: rawEntry first
+		command: rawEntry second
+		query: rawEntry third
+		executionTimeMs: rawEntry fourth
+		parameters: rawEntry fifth
 ]
 
 { #category : 'accessing' }
