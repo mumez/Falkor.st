@@ -1,13 +1,15 @@
 "
 I test FkGraphEndpoint's command-level behavior against a real FalkorDB instance for commands
-that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, and
-GRAPH.CONFIG.
+that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO,
+GRAPH.CONFIG, and GRAPH.CONSTRAINT.
 
 Coverage:
 - graph-ro-query spec: read-only Cypher query execution, same result-set shape as GRAPH.QUERY
 - graph-delete spec: deleting a graph answers a plain status string reply
 - graph-info spec: server status query, with and without section options
 - graph-config spec: getting one or all config parameters, and setting a runtime parameter
+- graph-constraint spec: creating and dropping MANDATORY/UNIQUE constraints on node labels and
+  relationship types
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -106,4 +108,79 @@ FkGraphEndpointTest >> testGraphConfigSetUpdatesParamValue [
 		ensure: [
 			self endpoint
 				graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: originalValue; yourself) ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> createConstraintType: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	^ self endpoint
+		graphConstraintCreate: self graphName
+		type: constraintType
+		entityType: entityType
+		entityName: entityName
+		properties: propertiesCollection
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> dropConstraintType: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	^ self endpoint
+		graphConstraintDrop: self graphName
+		type: constraintType
+		entityType: entityType
+		entityName: entityName
+		properties: propertiesCollection
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintCreateMandatoryOnNodeSucceeds [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	[
+		reply := self
+			createConstraintType: 'MANDATORY'
+			entityType: 'NODE'
+			entityName: 'Person'
+			properties: #('name').
+		self assert: reply equals: 'PENDING' ]
+		ensure: [
+			self
+				dropConstraintType: 'MANDATORY'
+				entityType: 'NODE'
+				entityName: 'Person'
+				properties: #('name') ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintCreateUniqueOnNodeSucceeds [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {email: ''alice@example.com''})'.
+	self endpoint graphQuery: self graphName cypher: 'CREATE INDEX FOR (n:Person) ON (n.email)'.
+	[
+		reply := self createConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email').
+		self assert: reply equals: 'PENDING' ]
+		ensure: [ self dropConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email') ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintDropRemovesConstraint [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	self createConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name').
+	reply := self
+		dropConstraintType: 'MANDATORY'
+		entityType: 'NODE'
+		entityName: 'Person'
+		properties: #('name').
+	self assert: reply equals: 'OK'
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintOnRelationshipTypeCreateAndDrop [
+	| createReply dropReply |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Person)-[:KNOWS {since: 2020}]->(:Person)'.
+	createReply := self createConstraintType: 'MANDATORY' entityType: 'RELATIONSHIP' entityName: 'KNOWS' properties: #('since').
+	self assert: createReply equals: 'PENDING'.
+	dropReply := self dropConstraintType: 'MANDATORY' entityType: 'RELATIONSHIP' entityName: 'KNOWS' properties: #('since').
+	self assert: dropReply equals: 'OK'
 ]

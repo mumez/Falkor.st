@@ -1,18 +1,20 @@
 "
 I am the Redis endpoint FkFalkorStick creates for talking to FalkorDB. I add GRAPH.QUERY,
-GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, and GRAPH.CONFIG command execution on top of
-RsRedisEndpoint's RESP transport, including FalkorDB's `CYPHER param=val ...` parameter-passing
-convention and the `--compact` result format, and decode GRAPH.QUERY/GRAPH.RO_QUERY replies into
-FkQueryResult (see FkQueryResult for the verbose/compact decoding rules). For compact decoding I
-also own the per-graph label/relationship-type/property-key id caches, since resolving those ids
-requires per-connection state that a stateless RsRedisEndpoint extension method couldn't hold.
+GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG, and GRAPH.CONSTRAINT command execution on
+top of RsRedisEndpoint's RESP transport, including FalkorDB's `CYPHER param=val ...`
+parameter-passing convention and the `--compact` result format, and decode GRAPH.QUERY/
+GRAPH.RO_QUERY replies into FkQueryResult (see FkQueryResult for the verbose/compact decoding
+rules). For compact decoding I also own the per-graph label/relationship-type/property-key id
+caches, since resolving those ids requires per-connection state that a stateless RsRedisEndpoint
+extension method couldn't hold.
 
 Responsibility:
 - Send GRAPH.QUERY and GRAPH.RO_QUERY commands (with or without bound parameters, verbose or
   compact) via #unifiedCommand:
-- Send GRAPH.DELETE, GRAPH.INFO, and GRAPH.CONFIG GET/SET commands via #unifiedCommand:, answering
-  their raw replies undecoded (GRAPH.DELETE's status string, GRAPH.INFO's ad-hoc section data, and
-  GRAPH.CONFIG's parameter list are not FkQueryResult-shaped)
+- Send GRAPH.DELETE, GRAPH.INFO, GRAPH.CONFIG GET/SET, and GRAPH.CONSTRAINT CREATE/DROP commands
+  via #unifiedCommand:, answering their raw replies undecoded (GRAPH.DELETE's status string,
+  GRAPH.INFO's ad-hoc section data, GRAPH.CONFIG's parameter list, and GRAPH.CONSTRAINT's
+  PENDING/OK status string are not FkQueryResult-shaped)
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
 - Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
@@ -48,6 +50,10 @@ Public API and Key Messages:
 - #graphConfigGetAll - shortcut for #graphConfigGet: '*', answering all runtime config parameters
 - #graphConfigSet: - set one or more runtime config parameters from a Dictionary (not persisted
   across a server restart), answering the raw reply
+- #graphConstraintCreate:type:entityType:entityName:properties: - create a MANDATORY or UNIQUE
+  schema constraint on a NODE label or RELATIONSHIP type's properties, answering the raw reply
+- #graphConstraintDrop:type:entityType:entityName:properties: - remove a previously created
+  constraint, same argument shape as #graphConstraintCreate:type:entityType:entityName:properties:
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -69,6 +75,20 @@ Class {
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
 }
+
+{ #category : 'private' }
+FkGraphEndpoint >> constraintCommandArgsFor: graphName type: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	| args |
+	args := OrderedCollection
+		with: graphName
+		with: constraintType
+		with: entityType
+		with: entityName
+		with: 'PROPERTIES'
+		with: propertiesCollection size.
+	args addAll: propertiesCollection.
+	^ args
+]
 
 { #category : 'private' }
 FkGraphEndpoint >> cypherLiteralFor: aValue [
@@ -122,6 +142,34 @@ FkGraphEndpoint >> graphConfigSet: paramsDictionary [
 	args := OrderedCollection with: 'GRAPH.CONFIG' with: 'SET'.
 	paramsDictionary keysAndValuesDo: [ :key :value |
 		args add: key; add: value ].
+	^ self unifiedCommand: args
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraintCreate: graphName type: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	| args |
+	args := OrderedCollection with: 'GRAPH.CONSTRAINT' with: 'CREATE'.
+	args addAll:
+		(self
+			constraintCommandArgsFor: graphName
+			type: constraintType
+			entityType: entityType
+			entityName: entityName
+			properties: propertiesCollection).
+	^ self unifiedCommand: args
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraintDrop: graphName type: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	| args |
+	args := OrderedCollection with: 'GRAPH.CONSTRAINT' with: 'DROP'.
+	args addAll:
+		(self
+			constraintCommandArgsFor: graphName
+			type: constraintType
+			entityType: entityType
+			entityName: entityName
+			properties: propertiesCollection).
 	^ self unifiedCommand: args
 ]
 
