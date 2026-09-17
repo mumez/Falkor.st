@@ -1,7 +1,8 @@
 "
 I test FkGraphEndpoint's command-level behavior against a real FalkorDB instance for commands
 that are not primarily about FkQueryResult decoding: GRAPH.RO_QUERY, GRAPH.DELETE, GRAPH.INFO,
-GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, GRAPH.PROFILE, GRAPH.LIST, and GRAPH.COPY.
+GRAPH.CONFIG, GRAPH.CONSTRAINT, GRAPH.EXPLAIN, GRAPH.PROFILE, GRAPH.LIST, GRAPH.COPY, GRAPH.MEMORY,
+and GRAPH.SLOWLOG.
 
 Coverage:
 - graph-ro-query spec: read-only Cypher query execution, same result-set shape as GRAPH.QUERY
@@ -16,6 +17,8 @@ Coverage:
   per-operation metrics, with and without bound parameters
 - graph-list spec: listing graph names present in the keyspace
 - graph-copy spec: copying a graph's data into a new graph name
+- graph-memory spec: reporting per-graph memory usage statistics, decoded into a Dictionary
+- graph-slowlog spec: reporting the graph's slowest queries, decoded into FkSlowLogEntry instances
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -233,6 +236,63 @@ FkGraphEndpointTest >> testGraphCopyCopiesGraphData [
 		result := self endpoint graphQuery: destGraphName cypher: 'MATCH (p:Person) RETURN p.name'.
 		self assert: result records first first equals: 'Alice' ]
 		ensure: [ self deleteGraphIgnoringErrors: destGraphName ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphMemoryUsageAnswersDictionaryWithData [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint graphMemoryUsage: self graphName.
+	self assert: reply class equals: Dictionary.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphMemoryUsageWithSamplesAnswersDictionaryWithData [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint graphMemoryUsage: self graphName samples: 5.
+	self assert: reply class equals: Dictionary.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphSlowLogAnswersEntriesForSlowQuery [
+	| reply entry |
+	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	reply := self endpoint graphSlowLog: self graphName.
+	self assert: reply class equals: OrderedCollection.
+	self deny: reply isEmpty.
+	entry := reply first.
+	self assert: entry class equals: FkSlowLogEntry.
+	self assert: entry command equals: 'GRAPH.QUERY'.
+	self assert: entry query equals: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self assert: entry executionTimeMs > 0.
+	self assert: entry timestamp notNil.
+	self assert: entry parameters isNil
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphSlowLogDecodesParametersWhenQueryWasBoundWithThem [
+	| reply entry |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'UNWIND range(1, $n) AS x RETURN sum(x)'
+		params: (Dictionary new at: 'n' put: 200000; yourself).
+	reply := self endpoint graphSlowLog: self graphName.
+	self deny: reply isEmpty.
+	entry := reply first.
+	self assert: entry parameters notNil.
+	self assert: (entry parameters includesSubstring: 'n=200000')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphSlowLogAnswersEmptyForGraphWithoutSlowQueries [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint graphSlowLog: self graphName.
+	self assert: reply class equals: OrderedCollection.
+	self assert: reply isEmpty
 ]
 
 { #category : 'tests' }
