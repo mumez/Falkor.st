@@ -13,14 +13,20 @@ BaselineOfFalkorSt >> baseline: spec [
 		self rediStick: spec.
 		self sCypher: spec.
 		spec
-			package: 'FalkorSt-Core' with: [ spec requires: #('RediStick' 'SCypher') ].
+			package: 'FalkorSt-Core' with: [ spec requires: #('RediStick') ].
 		spec
 			package: 'FalkorSt-Core-Tests' with: [ spec requires: #('FalkorSt-Core') ].
+		spec
+			package: 'FalkorSt-Objects' with: [ spec requires: #('FalkorSt-Core' 'SCypher') ].
+		spec
+			package: 'FalkorSt-Objects-Tests' with: [ spec requires: #('FalkorSt-Core-Tests' 'FalkorSt-Objects') ].
 
 		spec
 			group: 'default' with: #('Core');
 			group: 'Core' with: #('FalkorSt-Core');
-			group: 'Tests' with: #('FalkorSt-Core-Tests') ]
+			group: 'Tests' with: #('FalkorSt-Core-Tests');
+			group: 'Objects' with: #('FalkorSt-Objects');
+			group: 'ObjectsTests' with: #('FalkorSt-Objects-Tests') ]
 ]
 
 { #category : 'external projects' }
