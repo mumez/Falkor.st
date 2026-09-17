@@ -34,6 +34,10 @@ Collaborators:
   resolve compact ids
 - FkGraphInfoOptions: collects which GRAPH.INFO sections to request, evaluated against a caller's
   block in #graphInfo:
+- FkGraphConstraint: collects a constraint's type/entity/properties for the
+  #graphConstraintCreateWith:on: / #graphConstraintCreateBy:on: / #graphConstraintDropWith:on: /
+  #graphConstraintDropBy:on: object-based API, built by the caller or evaluated against a caller's
+  block
 - FkSlowLogEntry: the decoded value object I build one per raw GRAPH.SLOWLOG entry in #graphSlowLog:
 
 Public API and Key Messages:
@@ -61,6 +65,15 @@ Public API and Key Messages:
   schema constraint on a NODE label or RELATIONSHIP type's properties, answering the raw reply
 - #graphConstraintDrop:type:entityType:entityName:properties: - remove a previously created
   constraint, same argument shape as #graphConstraintCreate:type:entityType:entityName:properties:
+- #graphConstraintCreateWith:on: - create a constraint from an FkGraphConstraint against the named
+  graph, delegating to #graphConstraintCreate:type:entityType:entityName:properties:
+- #graphConstraintCreateBy:on: - like #graphConstraintCreateWith:on: but builds the FkGraphConstraint
+  by evaluating the caller's block against a fresh instance, e.g.
+  [ :c | c unique; node: 'Person'; props: #('email') ]
+- #graphConstraintDropWith:on: - drop a constraint from an FkGraphConstraint against the named
+  graph, delegating to #graphConstraintDrop:type:entityType:entityName:properties:
+- #graphConstraintDropBy:on: - block-based counterpart of #graphConstraintDropWith:on:, mirroring
+  #graphConstraintCreateBy:on:
 - #graphExplain:cypher: - construct a query execution plan without running it, answering the raw
   plan reply
 - #graphExplain:cypher:params: - like #graphExplain:cypher: with named parameters bound via the
@@ -197,6 +210,24 @@ FkGraphEndpoint >> graphConstraintCreate: graphName type: constraintType entityT
 ]
 
 { #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraintCreateBy: aBlock on: graphName [
+	| constraint |
+	constraint := FkGraphConstraint new.
+	aBlock value: constraint.
+	^ self graphConstraintCreateWith: constraint on: graphName
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraintCreateWith: aFkGraphConstraint on: graphName [
+	^ self
+		graphConstraintCreate: graphName
+		type: aFkGraphConstraint constraintType
+		entityType: aFkGraphConstraint entityType
+		entityName: aFkGraphConstraint entityName
+		properties: aFkGraphConstraint properties
+]
+
+{ #category : 'commands-graph' }
 FkGraphEndpoint >> graphConstraintDrop: graphName type: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
 	| args |
 	args := OrderedCollection with: 'GRAPH.CONSTRAINT' with: 'DROP'.
@@ -208,6 +239,24 @@ FkGraphEndpoint >> graphConstraintDrop: graphName type: constraintType entityTyp
 			entityName: entityName
 			properties: propertiesCollection).
 	^ self unifiedCommand: args
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraintDropBy: aBlock on: graphName [
+	| constraint |
+	constraint := FkGraphConstraint new.
+	aBlock value: constraint.
+	^ self graphConstraintDropWith: constraint on: graphName
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraintDropWith: aFkGraphConstraint on: graphName [
+	^ self
+		graphConstraintDrop: graphName
+		type: aFkGraphConstraint constraintType
+		entityType: aFkGraphConstraint entityType
+		entityName: aFkGraphConstraint entityName
+		properties: aFkGraphConstraint properties
 ]
 
 { #category : 'commands-graph' }

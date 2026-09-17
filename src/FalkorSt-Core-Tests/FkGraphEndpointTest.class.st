@@ -10,7 +10,9 @@ Coverage:
 - graph-info spec: server status query, with and without section options
 - graph-config spec: getting one or all config parameters, and setting a runtime parameter
 - graph-constraint spec: creating and dropping MANDATORY/UNIQUE constraints on node labels and
-  relationship types
+  relationship types, via the positional API, the FkGraphConstraint fluent builder, and the
+  FkGraphConstraint object-based #graphConstraintCreateWith:on:/#graphConstraintCreateBy:on:/
+  #graphConstraintDropWith:on:/#graphConstraintDropBy:on: methods
 - graph-explain spec: constructing a query plan without executing it, with and without bound
   parameters, answering the raw undecoded plan reply
 - graph-profile spec: executing a query and answering the raw undecoded plan reply augmented with
@@ -137,6 +139,18 @@ FkGraphEndpointTest >> dropConstraintType: constraintType entityType: entityType
 		entityType: entityType
 		entityName: entityName
 		properties: propertiesCollection
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> dropConstraintIgnoringErrorsType: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
+	[
+		self
+			dropConstraintType: constraintType
+			entityType: entityType
+			entityName: entityName
+			properties: propertiesCollection ]
+		on: Error
+		do: [ :ex |  ]
 ]
 
 { #category : 'tests' }
@@ -293,6 +307,78 @@ FkGraphEndpointTest >> testGraphSlowLogAnswersEmptyForGraphWithoutSlowQueries [
 	reply := self endpoint graphSlowLog: self graphName.
 	self assert: reply class equals: OrderedCollection.
 	self assert: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testFkGraphConstraintFluentBuilderUniqueOnNode [
+	| constraint |
+	constraint := FkGraphConstraint new.
+	constraint unique; node: 'Person'; props: #('email').
+	self assert: constraint constraintType equals: 'UNIQUE'.
+	self assert: constraint entityType equals: 'NODE'.
+	self assert: constraint entityName equals: 'Person'.
+	self assertCollection: constraint properties asArray equals: #('email')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testFkGraphConstraintFluentBuilderMandatoryOnRelationship [
+	| constraint |
+	constraint := FkGraphConstraint new.
+	constraint mandatory; relationship: 'KNOWS'; props: #('since').
+	self assert: constraint constraintType equals: 'MANDATORY'.
+	self assert: constraint entityType equals: 'RELATIONSHIP'.
+	self assert: constraint entityName equals: 'KNOWS'.
+	self assertCollection: constraint properties asArray equals: #('since')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintCreateWithSucceeds [
+	| constraint reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	constraint := FkGraphConstraint new.
+	constraint mandatory; node: 'Person'; props: #('name').
+	[
+		reply := self endpoint graphConstraintCreateWith: constraint on: self graphName.
+		self assert: reply equals: 'PENDING' ]
+		ensure: [ self dropConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintCreateBySucceeds [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	[
+		reply := self endpoint
+			graphConstraintCreateBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]
+			on: self graphName.
+		self assert: reply equals: 'PENDING' ]
+		ensure: [ self dropConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintDropWithRemovesConstraint [
+	| constraint reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	self createConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name').
+	constraint := FkGraphConstraint new.
+	constraint mandatory; node: 'Person'; props: #('name').
+	[
+		reply := self endpoint graphConstraintDropWith: constraint on: self graphName.
+		self assert: reply equals: 'OK' ]
+		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintDropBySucceeds [
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	self createConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name').
+	[
+		reply := self endpoint
+			graphConstraintDropBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]
+			on: self graphName.
+		self assert: reply equals: 'OK' ]
+		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
 ]
 
 { #category : 'tests' }
