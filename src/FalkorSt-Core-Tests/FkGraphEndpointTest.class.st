@@ -208,33 +208,31 @@ FkGraphEndpointTest >> testGraphProfileWithParamsAnswersNonEmptyReply [
 	self deny: reply isEmpty
 ]
 
+{ #category : 'private' }
+FkGraphEndpointTest >> deleteGraphIgnoringErrors: graphName [
+	[ self endpoint graphDelete: graphName ] on: Error do: [ :ex |  ]
+]
+
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphListIncludesCreatedGraph [
-	| listGraphName reply |
-	listGraphName := self graphName , '_list'.
-	[
-		self endpoint graphQuery: listGraphName cypher: 'CREATE (:Person)'.
-		reply := self endpoint graphList.
-		self assert: (reply includes: listGraphName) ]
-		ensure: [
-			[ self endpoint graphDelete: listGraphName ] on: Error do: [ :ex |  ] ]
+	| reply |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	reply := self endpoint graphList.
+	self assert: (reply includes: self graphName)
 ]
 
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphCopyCopiesGraphData [
-	| srcGraphName destGraphName reply result |
-	srcGraphName := self graphName , '_copySrc'.
+	| destGraphName reply result |
 	destGraphName := self graphName , '_copyDest'.
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
 	[
-		self endpoint graphQuery: srcGraphName cypher: 'CREATE (:Person {name: ''Alice''})'.
-		self endpoint graphCopy: srcGraphName to: destGraphName.
+		self endpoint graphCopy: self graphName to: destGraphName.
 		reply := self endpoint graphList.
 		self assert: (reply includes: destGraphName).
 		result := self endpoint graphQuery: destGraphName cypher: 'MATCH (p:Person) RETURN p.name'.
 		self assert: result records first first equals: 'Alice' ]
-		ensure: [
-			[ self endpoint graphDelete: srcGraphName ] on: Error do: [ :ex |  ].
-			[ self endpoint graphDelete: destGraphName ] on: Error do: [ :ex |  ] ]
+		ensure: [ self deleteGraphIgnoringErrors: destGraphName ]
 ]
 
 { #category : 'tests' }
