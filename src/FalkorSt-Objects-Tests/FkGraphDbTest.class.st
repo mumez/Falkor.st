@@ -1,6 +1,6 @@
 "
-I test FkGraphDb's two constructors, its #endpoint accessor, and its node-CRUD convenience API
-against a real FalkorDB instance.
+I test FkGraphDb's two constructors, its #endpoint accessor, and its node-CRUD and
+relationship-CRUD convenience API against a real FalkorDB instance.
 
 Coverage:
 - graph-object-api spec: ""Creating a handle that owns its connection""
@@ -11,6 +11,9 @@ Coverage:
 - graph-object-api spec: ""Creating and merging nodes""
 - graph-object-api spec: ""Finding nodes by id or label""
 - graph-object-api spec: ""Mutating and deleting nodes by id or label""
+- graph-object-api spec: ""Creating and merging relationships""
+- graph-object-api spec: ""Finding relationships by id""
+- graph-object-api spec: ""Mutating and deleting relationships by id""
 "
 Class {
 	#name : 'FkGraphDbTest',
@@ -265,4 +268,190 @@ FkGraphDbTest >> testDeleteNodesLabeledWhereRemovesOnlyMatchingNodes [
 	db deleteNodesLabeled: 'Person' where: [ :n | (n @ 'age') greaterThan: 25 ].
 	self assert: (db nodeAt: old id) isNil.
 	self deny: (db nodeAt: young id) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCreateRelationshipTypedCreatesADirectedOutRelationshipWithProperties [
+	"FalkorDB's CREATE rejects undirected patterns, so createRelationshipTyped: is an alias for
+	createOutRelationshipTyped: - this test asserts that alias behavior (direction included), not
+	just type/properties, so it can't silently pass if the two methods diverge."
+
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: { 'since' -> 2020 }.
+	self assert: rel type equals: 'KNOWS'.
+	self assert: (rel propertyAt: 'since') equals: 2020.
+	self assert: rel startNodeId equals: alice id.
+	self assert: rel endNodeId equals: bob id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCreateInRelationshipTypedCreatesARelationshipIntoTheStartNode [
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db createInRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: rel type equals: 'KNOWS'.
+	self assert: rel startNodeId equals: bob id.
+	self assert: rel endNodeId equals: alice id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCreateOutRelationshipTypedCreatesARelationshipOutOfTheStartNode [
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: rel type equals: 'KNOWS'.
+	self assert: rel startNodeId equals: alice id.
+	self assert: rel endNodeId equals: bob id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMergeRelationshipTypedIsIdempotent [
+	| db alice bob first second count |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	first := db mergeRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	second := db mergeRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: first id equals: second id.
+	count := (db runCypher: 'MATCH ()-[r:KNOWS]-() RETURN count(r)') records first first.
+	self assert: count equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMergeInRelationshipTypedCreatesARelationshipIntoTheStartNode [
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db mergeInRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: rel type equals: 'KNOWS'.
+	self assert: rel startNodeId equals: bob id.
+	self assert: rel endNodeId equals: alice id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMergeOutRelationshipTypedCreatesARelationshipOutOfTheStartNode [
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db mergeOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: rel type equals: 'KNOWS'.
+	self assert: rel startNodeId equals: alice id.
+	self assert: rel endNodeId equals: bob id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtFindsAnExistingRelationship [
+	| db alice bob created found |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	created := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: #().
+	found := db relationshipAt: created id.
+	self assert: found id equals: created id.
+	self assert: found type equals: 'KNOWS'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtAnswersNilWhenNotFound [
+	| db |
+	db := self db.
+	self assert: (db relationshipAt: 999999) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtPropertyAtPutMutatesTheProperty [
+	| db alice bob created reloaded |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	created := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: { 'since' -> 2020 }.
+	db relationshipAt: created id propertyAt: 'since' put: 2021.
+	reloaded := db relationshipAt: created id.
+	self assert: (reloaded propertyAt: 'since') equals: 2021
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtPropertiesReplacesAllProperties [
+	| db alice bob created reloaded |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	created := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: { 'since' -> 2020. 'weight' -> 5 }.
+	db relationshipAt: created id properties: { 'weight' -> 9 } asDictionary.
+	reloaded := db relationshipAt: created id.
+	self assert: (reloaded propertyAt: 'weight') equals: 9.
+	self assert: (reloaded propertyAt: 'since') isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtMergePropertiesMergesProperties [
+	| db alice bob created reloaded |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	created := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: { 'since' -> 2020. 'weight' -> 5 }.
+	db relationshipAt: created id mergeProperties: { 'weight' -> 9 } asDictionary.
+	reloaded := db relationshipAt: created id.
+	self assert: (reloaded propertyAt: 'weight') equals: 9.
+	self assert: (reloaded propertyAt: 'since') equals: 2020
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtPropertiesOnMissingRelationshipCreatesNothing [
+	| db |
+	db := self db.
+	db relationshipAt: 999999 properties: { 'weight' -> 9 } asDictionary.
+	self assert: (db relationshipAt: 999999) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtMergePropertiesOnMissingRelationshipCreatesNothing [
+	| db |
+	db := self db.
+	db relationshipAt: 999999 mergeProperties: { 'weight' -> 9 } asDictionary.
+	self assert: (db relationshipAt: 999999) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteRelationshipAtRemovesTheRelationship [
+	| db alice bob created |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	created := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: #().
+	db deleteRelationshipAt: created id.
+	self assert: (db relationshipAt: created id) isNil
 ]
