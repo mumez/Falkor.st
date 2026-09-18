@@ -65,9 +65,6 @@ Public API and Key Messages:
   answering the query's statistics
 - #deleteRelationshipAt: - MATCH a relationship by id and DELETE it, answering the query's
   statistics
-- #matchPathWithRelationshipsOfTypes:havingAll:fromNodeAt:endNodeIn:pathIn:whereIn: - a thin
-  wrapper around SCypher's CyQuery class-side method of the same name, answering the built CyQuery
-  without running it
 - #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: -
   MATCH one-hop paths of the given relationship type(s)/direction from a start node id to end nodes
   matching labels/properties, running the query and applying the given returner block to each

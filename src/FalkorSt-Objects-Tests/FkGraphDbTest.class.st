@@ -466,25 +466,6 @@ FkGraphDbTest >> createAliceKnowsBobIn: db [
 ]
 
 { #category : 'tests' }
-FkGraphDbTest >> testMatchPathWithRelationshipsOfTypesHavingAllFromNodeAtEndNodeInPathInWhereInBuildsAQuery [
-	| db alice aliceAndBob query result |
-	db := self db.
-	aliceAndBob := self createAliceKnowsBobIn: db.
-	alice := aliceAndBob first.
-	query := db
-		matchPathWithRelationshipsOfTypes: 'KNOWS'
-		havingAll: #()
-		fromNodeAt: alice id
-		endNodeIn: [ :e | e node: #('Person') props: #() ]
-		pathIn: [ :startNode :rel :endNode | startNode - rel -> endNode ]
-		whereIn: [ :s :r :e | nil ].
-	self assert: query class equals: CyQuery.
-	result := db runCypher: query.
-	self assert: result records size equals: 1.
-	self assert: result records first first class equals: FkPath
-]
-
-{ #category : 'tests' }
 FkGraphDbTest >> testOneHopPathsTypedDirectionOutReturningThePathAnswersMatchingPaths [
 	| aliceAndBob alice bob paths |
 	aliceAndBob := self createAliceKnowsBobIn: self db.
