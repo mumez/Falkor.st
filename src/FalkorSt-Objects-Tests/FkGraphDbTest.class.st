@@ -205,6 +205,29 @@ FkGraphDbTest >> testNodeAtMergePropertiesMergesProperties [
 ]
 
 { #category : 'tests' }
+FkGraphDbTest >> testNodeAtPropertiesEscapesQuotesAndBackslashesInStringValues [
+	| db created reloaded awkward |
+	awkward := 'She said "hi" \ bye'.
+	db := self db.
+	created := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	db nodeAt: created id properties: { 'name' -> awkward } asDictionary.
+	reloaded := db nodeAt: created id.
+	self assert: (reloaded propertyAt: 'name') equals: awkward
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testNodeAtMergePropertiesEscapesQuotesAndBackslashesInStringValues [
+	| db created reloaded awkward |
+	awkward := 'She said "hi" \ bye'.
+	db := self db.
+	created := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice'. 'age' -> 30 }.
+	db nodeAt: created id mergeProperties: { 'name' -> awkward } asDictionary.
+	reloaded := db nodeAt: created id.
+	self assert: (reloaded propertyAt: 'name') equals: awkward.
+	self assert: (reloaded propertyAt: 'age') equals: 30
+]
+
+{ #category : 'tests' }
 FkGraphDbTest >> testDeleteNodeAtRemovesTheNode [
 	| db created |
 	db := self db.
