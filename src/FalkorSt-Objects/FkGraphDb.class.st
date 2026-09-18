@@ -8,6 +8,8 @@ Responsibility:
 - Hold a graph name together with the FkFalkorStick connection it is reached through
 - Lazily create and connect an FkFalkorStick from FkSettings when none is supplied
 - Answer the FkGraphEndpoint (#endpoint) that runs GRAPH.* commands for this graph
+- Provide thin #runCypher:/#runReadOnlyCypher: wrappers so callers don't have to route
+  through #endpoint and #name themselves
 
 Collaborators:
 - FkFalkorStick: the connection I hold or lazily create
@@ -19,6 +21,8 @@ Public API and Key Messages:
 - FkGraphDb class >> on:named: - uses an already-connected stick; graph name is required either way
 - #endpoint - self stick endpoint
 - #name - the graph name
+- #runCypher: cypherString - ^ self endpoint graphQuery: self name cypher: cypherString
+- #runReadOnlyCypher: cypherString - ^ self endpoint graphRoQuery: self name cypher: cypherString
 
 Implementation Points:
 - Closing/disconnecting the stick is the caller's responsibility in both cases; I never disconnect
@@ -68,6 +72,16 @@ FkGraphDb >> endpoint [
 { #category : 'accessing' }
 FkGraphDb >> name [
 	^ name
+]
+
+{ #category : 'querying' }
+FkGraphDb >> runCypher: cypherString [
+	^ self endpoint graphQuery: self name cypher: cypherString
+]
+
+{ #category : 'querying' }
+FkGraphDb >> runReadOnlyCypher: cypherString [
+	^ self endpoint graphRoQuery: self name cypher: cypherString
 ]
 
 { #category : 'private' }

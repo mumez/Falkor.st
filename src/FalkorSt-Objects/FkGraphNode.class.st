@@ -64,7 +64,7 @@ FkGraphNode >> delete [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: self id) delete: node.
-	self db endpoint graphQuery: self db name cypher: (self cypherStringFor: query)
+	self db runCypher: (self cypherStringFor: query)
 ]
 
 { #category : 'accessing' }
@@ -96,7 +96,7 @@ FkGraphNode >> propertyAt: key put: value [
 		match: node
 		where: (n getId equals: self id)
 		set: { (n @ key) to: value }.
-	self db endpoint graphQuery: self db name cypher: (self cypherStringFor: query).
+	self db runCypher: (self cypherStringFor: query).
 	self reload
 ]
 
@@ -116,6 +116,6 @@ FkGraphNode >> reload [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: self id) return: n.
-	result := self db endpoint graphQuery: self db name cypher: (self cypherStringFor: query).
+	result := self db runCypher: (self cypherStringFor: query).
 	rawNode := result records first first
 ]
