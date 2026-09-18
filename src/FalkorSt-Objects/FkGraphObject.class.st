@@ -48,15 +48,6 @@ FkGraphObject class >> on: aRawGraphObject in: aFkGraphDb [
 		yourself
 ]
 
-{ #category : 'private' }
-FkGraphObject >> cypherStringFor: aCyQuery [
-	"CyQuery's default delimiter is a bare carriage return, which FalkorDB's Cypher parser
-	rejects between clauses - use a space instead."
-
-	aCyQuery delimiter: ' '.
-	^ aCyQuery cypherString
-]
-
 { #category : 'accessing' }
 FkGraphObject >> db [
 	^ db
@@ -73,7 +64,7 @@ FkGraphObject >> delete [
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) delete: element.
-	self db runCypher: (self cypherStringFor: query)
+	self db runCypher: query
 ]
 
 { #category : 'accessing' }
@@ -105,7 +96,7 @@ FkGraphObject >> propertyAt: key put: value [
 		match: element
 		where: (n getId equals: self id)
 		set: { (n @ key) to: value }.
-	self db runCypher: (self cypherStringFor: query).
+	self db runCypher: query.
 	self reload
 ]
 
@@ -125,7 +116,7 @@ FkGraphObject >> reload [
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) return: n.
-	result := self db runCypher: (self cypherStringFor: query).
+	result := self db runCypher: query.
 	result records ifEmpty: [
 		^ FkGraphDbError noSuchObject signal: 'No graph object found for id ' , self id printString ].
 	rawGraphObject := result records first first
