@@ -455,3 +455,77 @@ FkGraphDbTest >> testDeleteRelationshipAtRemovesTheRelationship [
 	db deleteRelationshipAt: created id.
 	self assert: (db relationshipAt: created id) isNil
 ]
+
+{ #category : 'creating' }
+FkGraphDbTest >> createAliceKnowsBobIn: db [
+	| alice bob |
+	alice := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	^ { alice. bob }
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMatchPathWithRelationshipsOfTypesHavingAllFromNodeAtEndNodeInPathInWhereInBuildsAQuery [
+	| db alice aliceAndBob query result |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	alice := aliceAndBob first.
+	query := db
+		matchPathWithRelationshipsOfTypes: 'KNOWS'
+		havingAll: #()
+		fromNodeAt: alice id
+		endNodeIn: [ :e | e node: #('Person') props: #() ]
+		pathIn: [ :startNode :rel :endNode | startNode - rel -> endNode ]
+		whereIn: [ :s :r :e | nil ].
+	self assert: query class equals: CyQuery.
+	result := db runCypher: query.
+	self assert: result records size equals: 1.
+	self assert: result records first first class equals: FkPath
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testOneHopPathsTypedDirectionOutReturningThePathAnswersMatchingPaths [
+	| aliceAndBob alice bob paths |
+	aliceAndBob := self createAliceKnowsBobIn: self db.
+	alice := aliceAndBob first.
+	bob := aliceAndBob last.
+	paths := self db
+		oneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ]
+		returning: [ :path | path ].
+	self assert: paths size equals: 1.
+	self assertPath: paths first goesFrom: alice to: bob
+]
+
+{ #category : 'asserting' }
+FkGraphDbTest >> assertPath: aPath goesFrom: startNode to: endNode [
+	self assert: aPath class equals: FkGraphPath.
+	self assert: aPath startNode id equals: startNode id.
+	self assert: aPath endNode id equals: endNode id.
+	self assert: aPath relationships first type equals: 'KNOWS'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testOneHopPathsTypedDirectionOutReturningEndNodeAnswersWrappedEndNodes [
+	| db alice endNodes |
+	db := self db.
+	alice := (self createAliceKnowsBobIn: db) first.
+	endNodes := db
+		oneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ]
+		returning: [ :path | path endNode ].
+	self assert: endNodes size equals: 1.
+	self assert: endNodes first class equals: FkGraphNode.
+	self assert: (endNodes first propertyAt: 'name') equals: 'Bob'
+]
