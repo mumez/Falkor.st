@@ -24,7 +24,7 @@ BaselineOfFalkorSt >> baseline: spec [
 		spec
 			group: 'default' with: #('Core');
 			group: 'Core' with: #('FalkorSt-Core');
-			group: 'Tests' with: #('FalkorSt-Core-Tests');
+			group: 'Tests' with: #('FalkorSt-Core-Tests' 'FalkorSt-Objects' 'FalkorSt-Objects-Tests');
 			group: 'Objects' with: #('FalkorSt-Objects');
 			group: 'ObjectsTests' with: #('FalkorSt-Objects-Tests') ]
 ]
