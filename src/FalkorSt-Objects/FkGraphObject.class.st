@@ -11,10 +11,13 @@ Responsibility:
   wrapped raw value from FalkorDB so local state never diverges from what was actually committed
 - Require subclasses to supply the CyNode/CyRelationship pattern element used to match myself by id
   (#matchElementNamed:) - everything else about the match/set/delete/return Cypher is generic
+- Signal an FkGraphDbError (#NoSuchObject) instead of failing with SubscriptOutOfBounds when
+  #reload's MATCH-by-id finds no record (e.g. the object was deleted by another session)
 
 Collaborators:
 - FkGraphDb: runs the Cypher (built with SCypher's CyQuery plus my subclass's pattern element) my
   mutating operations need
+- FkGraphDbError: signaled by #reload when the object I was tracking no longer exists
 
 Public API and Key Messages:
 - FkGraphObject class >> on:in: - wraps a raw graph value with the FkGraphDb it was fetched through
@@ -123,5 +126,7 @@ FkGraphObject >> reload [
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) return: n.
 	result := self db runCypher: (self cypherStringFor: query).
+	result records ifEmpty: [
+		^ FkGraphDbError noSuchObject signal: 'No graph object found for id ' , self id printString ].
 	rawGraphObject := result records first first
 ]

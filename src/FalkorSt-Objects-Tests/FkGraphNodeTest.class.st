@@ -6,6 +6,7 @@ Coverage:
 - graph-object-api spec: ""Reading delegates to the wrapped node""
 - graph-object-api spec: ""Writing a property updates the graph and refreshes local state""
 - graph-object-api spec: ""No local-only mutation""
+- graph-object-api spec: ""Mutating a node deleted elsewhere signals a meaningful error""
 "
 Class {
 	#name : 'FkGraphNodeTest',
@@ -26,6 +27,17 @@ FkGraphNodeTest >> createGraphNode [
 		graphQuery: self graphName
 		cypher: 'CREATE (p:Person {name: ''Alice'', age: 30}) RETURN p'.
 	^ FkGraphNode on: rawNode records first first in: self db
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testMutatingANodeDeletedElsewhereSignalsANoSuchObjectError [
+	| graphNode |
+	graphNode := self createGraphNode.
+	self endpoint graphQuery: self graphName cypher: 'MATCH (p) DELETE p'.
+	self
+		should: [ graphNode propertyAt: 'age' put: 31 ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #NoSuchObject ]
 ]
 
 { #category : 'tests' }
