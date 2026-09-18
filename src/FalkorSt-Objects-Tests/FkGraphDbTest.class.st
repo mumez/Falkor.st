@@ -271,7 +271,11 @@ FkGraphDbTest >> testDeleteNodesLabeledWhereRemovesOnlyMatchingNodes [
 ]
 
 { #category : 'tests' }
-FkGraphDbTest >> testCreateRelationshipTypedCreatesAnUndirectedRelationshipWithProperties [
+FkGraphDbTest >> testCreateRelationshipTypedCreatesADirectedOutRelationshipWithProperties [
+	"FalkorDB's CREATE rejects undirected patterns, so createRelationshipTyped: is an alias for
+	createOutRelationshipTyped: - this test asserts that alias behavior (direction included), not
+	just type/properties, so it can't silently pass if the two methods diverge."
+
 	| db alice bob rel |
 	db := self db.
 	alice := db createNodeLabeled: 'Person'.
@@ -322,6 +326,30 @@ FkGraphDbTest >> testMergeRelationshipTypedIsIdempotent [
 	self assert: first id equals: second id.
 	count := (db runCypher: 'MATCH ()-[r:KNOWS]-() RETURN count(r)') records first first.
 	self assert: count equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMergeInRelationshipTypedCreatesARelationshipIntoTheStartNode [
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db mergeInRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: rel type equals: 'KNOWS'.
+	self assert: rel startNodeId equals: bob id.
+	self assert: rel endNodeId equals: alice id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMergeOutRelationshipTypedCreatesARelationshipOutOfTheStartNode [
+	| db alice bob rel |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	rel := db mergeOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	self assert: rel type equals: 'KNOWS'.
+	self assert: rel startNodeId equals: alice id.
+	self assert: rel endNodeId equals: bob id
 ]
 
 { #category : 'tests' }
@@ -395,6 +423,22 @@ FkGraphDbTest >> testRelationshipAtMergePropertiesMergesProperties [
 	reloaded := db relationshipAt: created id.
 	self assert: (reloaded propertyAt: 'weight') equals: 9.
 	self assert: (reloaded propertyAt: 'since') equals: 2020
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtPropertiesOnMissingRelationshipCreatesNothing [
+	| db |
+	db := self db.
+	db relationshipAt: 999999 properties: { 'weight' -> 9 } asDictionary.
+	self assert: (db relationshipAt: 999999) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtMergePropertiesOnMissingRelationshipCreatesNothing [
+	| db |
+	db := self db.
+	db relationshipAt: 999999 mergeProperties: { 'weight' -> 9 } asDictionary.
+	self assert: (db relationshipAt: 999999) isNil
 ]
 
 { #category : 'tests' }

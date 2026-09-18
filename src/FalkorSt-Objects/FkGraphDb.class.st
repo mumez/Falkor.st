@@ -86,10 +86,13 @@ Implementation Points:
   MATCH/MERGE. They swap the query's trailing RETURN p for RETURN r via
   #firstRelationshipFromCreatePathQuery:returning: instead, so FalkorDB answers the raw
   FkRelationship directly with no path involved.
-- #createRelationshipTyped:fromNodeId:toNodeId:properties: also builds a directed (fromNodeId ->
+- #createRelationshipTyped:fromNodeId:toNodeId:properties: builds a directed (fromNodeId ->
   toNodeId) pattern rather than SgGraphDb's undirected one: FalkorDB's Cypher parser separately
   rejects an undirected pattern in CREATE ('Only directed relationships are supported in CREATE'),
-  unlike Neo4j. MERGE tolerates undirected patterns, so the merge counterpart is unaffected.
+  unlike Neo4j. There is no undirected CREATE to fall back to, so it is simply an alias for
+  #createOutRelationshipTyped:fromNodeId:toNodeId:properties:, kept as its own method for API
+  parity with SgGraphDb's three-way naming. MERGE tolerates undirected patterns, so the merge
+  counterpart is unaffected.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -137,19 +140,15 @@ FkGraphDb >> createNodeLabeled: labelOrLabels properties: props [
 FkGraphDb >> createRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
 	"Unlike SgGraphDb's Neo4j-oriented reference, FalkorDB's Cypher parser rejects an undirected
 	pattern in a CREATE clause ('Only directed relationships are supported in CREATE') - MERGE
-	tolerates it, but CREATE does not. Build a from-id -> to-id directed pattern instead; callers who
-	need to pick the opposite direction should use #createInRelationshipTyped:fromNodeId:toNodeId:properties:."
+	tolerates it, but CREATE does not. There is no undirected CREATE to fall back to, so this is
+	simply an alias for #createOutRelationshipTyped:fromNodeId:toNodeId:properties: (fromNodeId ->
+	toNodeId), kept as its own method for API parity with SgGraphDb's three-way naming."
 
-	| r query |
-	query := CyQuery
-		matchPathWithNodeAt: startNodeId
-		nodeAt: endNodeId
-		createIn: [ :startNode :endNode :relIdentifier |
-			| rel |
-			r := relIdentifier.
-			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
-			startNode - rel -> endNode ].
-	^ self firstRelationshipFromCreatePathQuery: query returning: r
+	^ self
+		createOutRelationshipTyped: typeOrTypes
+		fromNodeId: startNodeId
+		toNodeId: endNodeId
+		properties: propertiesArray
 ]
 
 { #category : 'actions-relationships' }
@@ -305,6 +304,8 @@ FkGraphDb >> firstRelationshipFromCreatePathQuery: query returning: r [
 	comes back directly and there is no path left to unwrap."
 
 	| result |
+	(query statements last isKindOf: CyReturn)
+		ifFalse: [ self error: 'Expected the query''s trailing statement to be a CyReturn' ].
 	query statements removeLast.
 	query addReturn: r.
 	result := self runCypher: query.
