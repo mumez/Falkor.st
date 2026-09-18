@@ -302,23 +302,12 @@ FkGraphDb >> relationshipAt: systemId propertyAt: key put: value [
 ]
 
 { #category : 'actions-paths' }
-FkGraphDb >> matchPathWithRelationshipsOfTypes: typeOrTypes havingAll: relPropsArray fromNodeAt: startNodeId endNodeIn: endNodeBlock pathIn: pathCreationBlock whereIn: whereClauseBuilder [
-	^ CyQuery
-		matchPathWithRelationshipsOfTypes: typeOrTypes
-		havingAll: relPropsArray
-		fromNodeAt: startNodeId
-		endNodeIn: endNodeBlock
-		pathIn: pathCreationBlock
-		whereIn: whereClauseBuilder
-]
-
-{ #category : 'actions-paths' }
 FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder returning: returner [
 	| pathBlock query result |
 	pathBlock := [ :startNode :rel :endNode | startNode - rel - endNode ].
 	direction == #in ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode <- rel - endNode ] ].
 	direction == #out ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode - rel -> endNode ] ].
-	query := self
+	query := CyQuery
 		matchPathWithRelationshipsOfTypes: typeOrTypes
 		havingAll: relProps
 		fromNodeAt: startNodeId
