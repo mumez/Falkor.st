@@ -49,6 +49,22 @@ Public API and Key Messages:
 - #deleteNodesLabeled:havingAll: / #deleteNodesLabeled:where: - bulk-delete nodes matching a
   label plus a property-equality filter or an arbitrary where-clause block, answering the query's
   statistics
+- #createRelationshipTyped:fromNodeId:toNodeId:properties: / #createInRelationshipTyped:.../
+  #createOutRelationshipTyped:... - CREATE a relationship between two existing nodes by id
+  (fromNodeId -> toNodeId / toNodeId -> fromNodeId / fromNodeId -> toNodeId respectively -
+  FalkorDB's CREATE always needs an explicit direction), answering it wrapped as an
+  FkGraphRelationship
+- #mergeRelationshipTyped:fromNodeId:toNodeId:properties: / #mergeInRelationshipTyped:.../
+  #mergeOutRelationshipTyped:... - MERGE (create-if-absent) the same three directional variants
+- #relationshipAt: - MATCH a relationship by its internal id, answering it wrapped as an
+  FkGraphRelationship, or nil when no such relationship exists
+- #relationshipAt:propertyAt:put: - SET a single property by id without fetching the relationship
+  first, answering the query's statistics
+- #relationshipAt:properties: / #relationshipAt:mergeProperties: - SET a relationship's whole
+  property map by id without fetching it first, bound as a single #runCypher:arguments: parameter,
+  answering the query's statistics
+- #deleteRelationshipAt: - MATCH a relationship by id and DELETE it, answering the query's
+  statistics
 - #cypherStringFor: aCypherQueryOrString - answers a raw Cypher string unchanged, or renders a
   CyQuery with a FalkorDB-safe delimiter; called internally by #runCypher:/#runReadOnlyCypher: so
   callers can pass either a string or a CyQuery straight through
@@ -59,6 +75,21 @@ Implementation Points:
 - Node-CRUD methods mirror SgGraphDb (../SCypherGraph, reference-only), building Cypher with
   SCypher's CyNode/CyQuery/CyCreate/CyMerge/CyReturn, but answer FkGraphNode-wrapped results
   instead of SgGraphDb's #objectFromCypherResult: raw-record wrapping
+- Relationship-CRUD methods mirror SgGraphDb's actions-relationships methods the same way, using
+  CyRelationship/CyQuery's matchPathWithNodeAt:nodeAt:createIn:/mergeIn: shortcuts, which both
+  build a query returning the whole path (as an FkPath) rather than the relationship alone.
+- The three merge*RelationshipTyped:... methods use that path result as-is, unwrapping it via
+  #firstRelationshipOrNilFrom: to get at the raw FkRelationship before wrapping it as an
+  FkGraphRelationship.
+- The three create*RelationshipTyped:... methods cannot: FalkorDB's Cypher parser rejects
+  'RETURN p' straight after a 'CREATE p = ...' path assignment ('p' not defined), unlike after
+  MATCH/MERGE. They swap the query's trailing RETURN p for RETURN r via
+  #firstRelationshipFromCreatePathQuery:returning: instead, so FalkorDB answers the raw
+  FkRelationship directly with no path involved.
+- #createRelationshipTyped:fromNodeId:toNodeId:properties: also builds a directed (fromNodeId ->
+  toNodeId) pattern rather than SgGraphDb's undirected one: FalkorDB's Cypher parser separately
+  rejects an undirected pattern in CREATE ('Only directed relationships are supported in CREATE'),
+  unlike Neo4j. MERGE tolerates undirected patterns, so the merge counterpart is unaffected.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -100,6 +131,185 @@ FkGraphDb >> createNodeLabeled: labelOrLabels properties: props [
 	query := CyQuery statements: { CyCreate of: node. CyReturn of: n }.
 	result := self runCypher: query.
 	^ self firstNodeOrNilFrom: result
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> createRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
+	"Unlike SgGraphDb's Neo4j-oriented reference, FalkorDB's Cypher parser rejects an undirected
+	pattern in a CREATE clause ('Only directed relationships are supported in CREATE') - MERGE
+	tolerates it, but CREATE does not. Build a from-id -> to-id directed pattern instead; callers who
+	need to pick the opposite direction should use #createInRelationshipTyped:fromNodeId:toNodeId:properties:."
+
+	| r query |
+	query := CyQuery
+		matchPathWithNodeAt: startNodeId
+		nodeAt: endNodeId
+		createIn: [ :startNode :endNode :relIdentifier |
+			| rel |
+			r := relIdentifier.
+			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
+			startNode - rel -> endNode ].
+	^ self firstRelationshipFromCreatePathQuery: query returning: r
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> createInRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
+	| r query |
+	query := CyQuery
+		matchPathWithNodeAt: startNodeId
+		nodeAt: endNodeId
+		createIn: [ :startNode :endNode :relIdentifier |
+			| rel |
+			r := relIdentifier.
+			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
+			startNode <- rel - endNode ].
+	^ self firstRelationshipFromCreatePathQuery: query returning: r
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> createOutRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
+	| r query |
+	query := CyQuery
+		matchPathWithNodeAt: startNodeId
+		nodeAt: endNodeId
+		createIn: [ :startNode :endNode :relIdentifier |
+			| rel |
+			r := relIdentifier.
+			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
+			startNode - rel -> endNode ].
+	^ self firstRelationshipFromCreatePathQuery: query returning: r
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> mergeRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
+	| query result |
+	query := CyQuery
+		matchPathWithNodeAt: startNodeId
+		nodeAt: endNodeId
+		mergeIn: [ :startNode :endNode :relIdentifier |
+			| rel |
+			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
+			startNode - rel - endNode ].
+	result := self runCypher: query.
+	^ self firstRelationshipOrNilFrom: result
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> mergeInRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
+	| query result |
+	query := CyQuery
+		matchPathWithNodeAt: startNodeId
+		nodeAt: endNodeId
+		mergeIn: [ :startNode :endNode :relIdentifier |
+			| rel |
+			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
+			startNode <- rel - endNode ].
+	result := self runCypher: query.
+	^ self firstRelationshipOrNilFrom: result
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> mergeOutRelationshipTyped: typeOrTypes fromNodeId: startNodeId toNodeId: endNodeId properties: propertiesArray [
+	| query result |
+	query := CyQuery
+		matchPathWithNodeAt: startNodeId
+		nodeAt: endNodeId
+		mergeIn: [ :startNode :endNode :relIdentifier |
+			| rel |
+			rel := relIdentifier rel: typeOrTypes props: propertiesArray.
+			startNode - rel -> endNode ].
+	result := self runCypher: query.
+	^ self firstRelationshipOrNilFrom: result
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> deleteRelationshipAt: systemId [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery match: rel where: (r getId equals: systemId) delete: r.
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipAt: systemId [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery match: rel where: (r getId equals: systemId) return: r.
+	result := self runCypher: query.
+	result records ifEmpty: [ ^ nil ].
+	^ FkGraphRelationship on: result records first first in: self
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipAt: systemId mergeProperties: argsDict [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery
+		match: rel
+		where: (r getId equals: systemId)
+		set: (r addAll: 'values' asCypherParameter).
+	result := self runCypher: query arguments: (self valuesArgumentsFor: argsDict).
+	^ result statistics
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipAt: systemId properties: argsDict [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery
+		match: rel
+		where: (r getId equals: systemId)
+		set: (r to: 'values' asCypherParameter).
+	result := self runCypher: query arguments: (self valuesArgumentsFor: argsDict).
+	^ result statistics
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipAt: systemId propertyAt: key put: value [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery match: rel where: (r getId equals: systemId) set: { (r @ key) to: value }.
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'private' }
+FkGraphDb >> firstRelationshipOrNilFrom: aFkQueryResult [
+	| path |
+	aFkQueryResult records ifEmpty: [ ^ nil ].
+	path := aFkQueryResult records first first.
+	^ FkGraphRelationship on: path relationships first in: self
+]
+
+{ #category : 'private' }
+FkGraphDb >> firstRelationshipFromCreatePathQuery: query returning: r [
+	"FalkorDB's Cypher parser rejects 'RETURN p' straight after a CREATE p = ... path assignment
+	('p' not defined), unlike after MATCH/MERGE - swap the query's trailing RETURN p (added by
+	CyQuery's matchPathWithNodeAt:nodeAt:createIn:) for RETURN r instead, so the raw FkRelationship
+	comes back directly and there is no path left to unwrap."
+
+	| result |
+	query statements removeLast.
+	query addReturn: r.
+	result := self runCypher: query.
+	result records ifEmpty: [ ^ nil ].
+	^ FkGraphRelationship on: result records first first in: self
 ]
 
 { #category : 'factory' }
