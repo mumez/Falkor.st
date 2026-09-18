@@ -58,6 +58,22 @@ FkGraphEndpointTest >> testGraphRoQueryWithParams [
 ]
 
 { #category : 'tests' }
+FkGraphEndpointTest >> testGraphQueryWithParamsBindsAWholeDictionaryAsAMapLiteral [
+	| result values |
+	values := Dictionary new
+		at: 'name' put: 'She said "hi" \ bye';
+		at: 'age' put: 40;
+		yourself.
+	self endpoint graphQuery: self graphName cypher: 'CREATE (p:Person)'.
+	result := self endpoint
+		graphQuery: self graphName
+		cypher: 'MATCH (p:Person) SET p += $values RETURN p.name, p.age'
+		params: (Dictionary new at: 'values' put: values; yourself).
+	self assert: result records first first equals: (values at: 'name').
+	self assert: result records first second equals: (values at: 'age')
+]
+
+{ #category : 'tests' }
 FkGraphEndpointTest >> testGraphRoQueryVerbose [
 	| result |
 	self endpoint

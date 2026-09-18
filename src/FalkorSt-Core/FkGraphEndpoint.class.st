@@ -95,8 +95,11 @@ Public API and Key Messages:
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
   not as nil/partial replies
-- Parameter values are rendered as Cypher literals: strings are quoted and escaped, nil becomes
-  null, everything else (numbers, booleans) uses its Smalltalk #printString
+- Parameter values are rendered as Cypher literals via SCypher's polymorphic #cypherValueString
+  (Dictionary's override renders a genuine Cypher map literal with unquoted keys, which is what
+  FalkorDB's CYPHER-prefix parameter parser requires - it rejects JSON's quoted keys even though
+  the full query parser accepts them inline) - this lets a whole property map be bound as a single
+  named parameter, not just scalars
 - Id caches are Dictionaries of graphName -> Array of names, indexed by id (0-based); a lookup
   past the end of the cached array triggers one refresh via CALL db.labels()/relationshipTypes()/
   propertyKeys() before resolving (see design.md Decision 4)
@@ -132,28 +135,14 @@ FkGraphEndpoint >> constraintCommandArgsFor: graphName type: constraintType enti
 ]
 
 { #category : 'private' }
-FkGraphEndpoint >> cypherLiteralFor: aValue [
-	aValue ifNil: [ ^ 'null' ].
-	aValue isString ifTrue: [ ^ self cypherStringLiteralFor: aValue ].
-	^ aValue printString
-]
-
-{ #category : 'private' }
 FkGraphEndpoint >> cypherParamsClauseFor: paramsDictionary [
 	^ String streamContents: [ :s |
 		paramsDictionary keysAndValuesDo: [ :key :value |
 			s
 				nextPutAll: key;
 				nextPut: $=;
-				nextPutAll: (self cypherLiteralFor: value);
+				nextPutAll: value cypherValueString;
 				nextPut: $  ] ]
-]
-
-{ #category : 'private' }
-FkGraphEndpoint >> cypherStringLiteralFor: aString [
-	| escaped |
-	escaped := (aString copyReplaceAll: '\' with: '\\') copyReplaceAll: '"' with: '\"'.
-	^ '"' , escaped , '"'
 ]
 
 { #category : 'private' }
