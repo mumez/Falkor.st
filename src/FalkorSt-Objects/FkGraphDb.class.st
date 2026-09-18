@@ -65,6 +65,10 @@ Public API and Key Messages:
   answering the query's statistics
 - #deleteRelationshipAt: - MATCH a relationship by id and DELETE it, answering the query's
   statistics
+- #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: -
+  MATCH one-hop paths of the given relationship type(s)/direction from a start node id to end nodes
+  matching labels/properties, running the query and applying the given returner block to each
+  FkGraphPath-wrapped result, answering the collection of returner results
 - #cypherStringFor: aCypherQueryOrString - answers a raw Cypher string unchanged, or renders a
   CyQuery with a FalkorDB-safe delimiter; called internally by #runCypher:/#runReadOnlyCypher: so
   callers can pass either a string or a CyQuery straight through
@@ -93,6 +97,12 @@ Implementation Points:
   #createOutRelationshipTyped:fromNodeId:toNodeId:properties:, kept as its own method for API
   parity with SgGraphDb's three-way naming. MERGE tolerates undirected patterns, so the merge
   counterpart is unaffected.
+- #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: mirrors
+  SgGraphDb's method of the same name, but applies its returner block to the already-wrapped
+  FkGraphPath rather than to the raw FkPath before a generic dispatch-based wrap - falkor.st always
+  wraps explicitly by class first (see the relationship-CRUD methods above), so the returner can
+  pull startNode/endNode/relationships already as FkGraphNode/FkGraphRelationship without any
+  further wrapping step.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -286,6 +296,24 @@ FkGraphDb >> relationshipAt: systemId propertyAt: key put: value [
 	query := CyQuery match: rel where: (r getId equals: systemId) set: { (r @ key) to: value }.
 	result := self runCypher: query.
 	^ result statistics
+]
+
+{ #category : 'actions-paths' }
+FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder returning: returner [
+	| pathBlock query result |
+	pathBlock := [ :startNode :rel :endNode | startNode - rel - endNode ].
+	direction == #in ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode <- rel - endNode ] ].
+	direction == #out ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode - rel -> endNode ] ].
+	query := CyQuery
+		matchPathWithRelationshipsOfTypes: typeOrTypes
+		havingAll: relProps
+		fromNodeAt: startNodeId
+		endNodeIn: [ :e | e node: labels props: endNodeProps ]
+		pathIn: pathBlock
+		whereIn: whereClauseBuilder.
+	result := self runCypher: query.
+	^ result records collect: [ :record |
+		returner value: (FkGraphPath on: record first in: self) ]
 ]
 
 { #category : 'private' }
