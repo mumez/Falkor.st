@@ -135,23 +135,13 @@ FkGraphEndpoint >> constraintCommandArgsFor: graphName type: constraintType enti
 ]
 
 { #category : 'private' }
-FkGraphEndpoint >> cypherLiteralFor: aValue [
-	"SCypher's #cypherValueString is polymorphic per class: Dictionary renders a genuine Cypher
-	map literal with unquoted keys (what FalkorDB's CYPHER-prefix parameter parser requires),
-	while String/number/nil/Boolean render via JSON, which happens to match Cypher literal syntax
-	for those."
-
-	^ aValue cypherValueString
-]
-
-{ #category : 'private' }
 FkGraphEndpoint >> cypherParamsClauseFor: paramsDictionary [
 	^ String streamContents: [ :s |
 		paramsDictionary keysAndValuesDo: [ :key :value |
 			s
 				nextPutAll: key;
 				nextPut: $=;
-				nextPutAll: (self cypherLiteralFor: value);
+				nextPutAll: value cypherValueString;
 				nextPut: $  ] ]
 ]
 
