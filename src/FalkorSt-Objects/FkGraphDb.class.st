@@ -23,7 +23,11 @@ Public API and Key Messages:
 - #name - the graph name
 - #runCypher: cypherQueryOrString - runs a raw Cypher string or a CyQuery (rendered via
   #cypherStringFor: first) as a write query
-- #runReadOnlyCypher: cypherQueryOrString - same, as a read-only query
+- #runCypher:arguments: - like #runCypher: but binds a Dictionary of named parameters via
+  FkGraphEndpoint's CYPHER-prefix convention, so a whole property map can be passed as one bound
+  parameter instead of being inlined into the Cypher string
+- #runReadOnlyCypher: cypherQueryOrString - same as #runCypher:, as a read-only query
+- #runReadOnlyCypher:arguments: - like #runCypher:arguments:, as a read-only query
 - #createNodeLabeled: / #createNodeLabeled:properties: - CREATE a node with the given label(s),
   answering it wrapped as an FkGraphNode
 - #mergeNodeLabeled: / #mergeNodeLabeled:properties: - MERGE (create-if-absent) a node with the
@@ -35,8 +39,11 @@ Public API and Key Messages:
   collection of FkGraphNode
 - #nodesLabeled:where:orderBy:skip:limit: / #nodesLabeled:where:skip:limit: - like
   #nodesLabeled:where: with ORDER BY/SKIP/LIMIT applied
-- #nodeAt:propertyAt:put: / #nodeAt:properties: / #nodeAt:mergeProperties: - SET a node's
-  property(ies) by id without fetching it first, answering the query's statistics
+- #nodeAt:propertyAt:put: - SET a single property by id without fetching the node first,
+  answering the query's statistics
+- #nodeAt:properties: / #nodeAt:mergeProperties: - SET a node's whole property map by id without
+  fetching it first, bound as a single #runCypher:arguments: parameter (not inlined into the
+  Cypher string), answering the query's statistics
 - #deleteNodeAt: / #deleteNode: - MATCH a node by id (or by an FkGraphNode's id) and DELETE it,
   answering the query's statistics
 - #deleteNodesLabeled:havingAll: / #deleteNodesLabeled:where: - bulk-delete nodes matching a
@@ -174,8 +181,26 @@ FkGraphDb >> runCypher: cypherQueryOrString [
 ]
 
 { #category : 'querying' }
+FkGraphDb >> runCypher: cypherQueryOrString arguments: argsDict [
+	^ self
+		endpoint
+		graphQuery: self name
+		cypher: (self cypherStringFor: cypherQueryOrString)
+		params: argsDict
+]
+
+{ #category : 'querying' }
 FkGraphDb >> runReadOnlyCypher: cypherQueryOrString [
 	^ self endpoint graphRoQuery: self name cypher: (self cypherStringFor: cypherQueryOrString)
+]
+
+{ #category : 'querying' }
+FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict [
+	^ self
+		endpoint
+		graphRoQuery: self name
+		cypher: (self cypherStringFor: cypherQueryOrString)
+		params: argsDict
 ]
 
 { #category : 'actions-nodes' }
@@ -213,8 +238,11 @@ FkGraphDb >> nodeAt: systemId mergeProperties: argsDict [
 	| n node query result |
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
-	query := CyQuery match: node where: (n getId equals: systemId) set: (n addAll: argsDict).
-	result := self runCypher: query.
+	query := CyQuery
+		match: node
+		where: (n getId equals: systemId)
+		set: (n addAll: 'values' asCypherParameter).
+	result := self runCypher: query arguments: (self valuesArgumentsFor: argsDict).
 	^ result statistics
 ]
 
@@ -223,8 +251,11 @@ FkGraphDb >> nodeAt: systemId properties: argsDict [
 	| n node query result |
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
-	query := CyQuery match: node where: (n getId equals: systemId) set: (n to: argsDict).
-	result := self runCypher: query.
+	query := CyQuery
+		match: node
+		where: (n getId equals: systemId)
+		set: (n to: 'values' asCypherParameter).
+	result := self runCypher: query arguments: (self valuesArgumentsFor: argsDict).
 	^ result statistics
 ]
 
@@ -292,6 +323,11 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder skip: skip li
 { #category : 'private' }
 FkGraphDb >> nodesFrom: aFkQueryResult [
 	^ aFkQueryResult records collect: [ :record | FkGraphNode on: record first in: self ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> valuesArgumentsFor: argsDict [
+	^ { 'values' -> argsDict asDictionary } asDictionary
 ]
 
 { #category : 'accessing' }

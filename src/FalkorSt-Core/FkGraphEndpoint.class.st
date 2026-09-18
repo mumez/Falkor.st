@@ -95,8 +95,12 @@ Public API and Key Messages:
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
   not as nil/partial replies
-- Parameter values are rendered as Cypher literals: strings are quoted and escaped, nil becomes
-  null, everything else (numbers, booleans) uses its Smalltalk #printString
+- Parameter values are rendered as Cypher literals: scalars/nil/Array go through SCypher's
+  CyObject class>>jsonStringFrom: (JSON happens to match Cypher literal syntax for these), while a
+  Dictionary is rendered as a genuine Cypher map literal with unquoted keys via
+  #cypherMapLiteralFor:, since FalkorDB's CYPHER-prefix parameter parser rejects JSON's quoted
+  keys even though the full query parser accepts them inline - this lets a whole property map be
+  bound as a single named parameter, not just scalars
 - Id caches are Dictionaries of graphName -> Array of names, indexed by id (0-based); a lookup
   past the end of the cached array triggers one refresh via CALL db.labels()/relationshipTypes()/
   propertyKeys() before resolving (see design.md Decision 4)
@@ -133,9 +137,27 @@ FkGraphEndpoint >> constraintCommandArgsFor: graphName type: constraintType enti
 
 { #category : 'private' }
 FkGraphEndpoint >> cypherLiteralFor: aValue [
-	aValue ifNil: [ ^ 'null' ].
-	aValue isString ifTrue: [ ^ self cypherStringLiteralFor: aValue ].
-	^ aValue printString
+	"CyObject jsonStringFrom: renders any Smalltalk value as a JSON literal, which FalkorDB's
+	Cypher parser accepts as a literal expression inside a query body - but not as a CYPHER-prefix
+	parameter value, whose map syntax requires unquoted keys, unlike JSON's quoted keys, so
+	a Dictionary needs its own Cypher-map-literal rendering here."
+
+	aValue isDictionary ifTrue: [ ^ self cypherMapLiteralFor: aValue ].
+	^ CyObject jsonStringFrom: aValue
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> cypherMapLiteralFor: aDictionary [
+	^ String streamContents: [ :s |
+		s nextPut: ${.
+		aDictionary associations
+			do: [ :assoc |
+				s
+					nextPutAll: assoc key asString;
+					nextPut: $:;
+					nextPutAll: (self cypherLiteralFor: assoc value) ]
+			separatedBy: [ s nextPut: $, ].
+		s nextPut: $} ]
 ]
 
 { #category : 'private' }
@@ -147,13 +169,6 @@ FkGraphEndpoint >> cypherParamsClauseFor: paramsDictionary [
 				nextPut: $=;
 				nextPutAll: (self cypherLiteralFor: value);
 				nextPut: $  ] ]
-]
-
-{ #category : 'private' }
-FkGraphEndpoint >> cypherStringLiteralFor: aString [
-	| escaped |
-	escaped := (aString copyReplaceAll: '\' with: '\\') copyReplaceAll: '"' with: '\"'.
-	^ '"' , escaped , '"'
 ]
 
 { #category : 'private' }
