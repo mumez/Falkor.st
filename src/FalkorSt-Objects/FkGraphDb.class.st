@@ -21,8 +21,9 @@ Public API and Key Messages:
 - FkGraphDb class >> on:named: - uses an already-connected stick; graph name is required either way
 - #endpoint - self stick endpoint
 - #name - the graph name
-- #runCypher: cypherString - ^ self endpoint graphQuery: self name cypher: cypherString
-- #runReadOnlyCypher: cypherString - ^ self endpoint graphRoQuery: self name cypher: cypherString
+- #runCypher: cypherQueryOrString - runs a raw Cypher string or a CyQuery (rendered via
+  #cypherStringFor: first) as a write query
+- #runReadOnlyCypher: cypherQueryOrString - same, as a read-only query
 - #createNodeLabeled: / #createNodeLabeled:properties: - CREATE a node with the given label(s),
   answering it wrapped as an FkGraphNode
 - #mergeNodeLabeled: / #mergeNodeLabeled:properties: - MERGE (create-if-absent) a node with the
@@ -41,8 +42,9 @@ Public API and Key Messages:
 - #deleteNodesLabeled:havingAll: / #deleteNodesLabeled:where: - bulk-delete nodes matching a
   label plus a property-equality filter or an arbitrary where-clause block, answering the query's
   statistics
-- #cypherStringFor: aCyQuery - renders a CyQuery with a FalkorDB-safe delimiter; used by every
-  Cypher-building method here and by FkGraphObject's mutating operations
+- #cypherStringFor: aCypherQueryOrString - answers a raw Cypher string unchanged, or renders a
+  CyQuery with a FalkorDB-safe delimiter; called internally by #runCypher:/#runReadOnlyCypher: so
+  callers can pass either a string or a CyQuery straight through
 
 Implementation Points:
 - Closing/disconnecting the stick is the caller's responsibility in both cases; I never disconnect
@@ -89,7 +91,7 @@ FkGraphDb >> createNodeLabeled: labelOrLabels properties: props [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n labels: (self labelsFor: labelOrLabels) props: props.
 	query := CyQuery statements: { CyCreate of: node. CyReturn of: n }.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ self firstNodeOrNilFrom: result
 ]
 
@@ -118,7 +120,7 @@ FkGraphDb >> deleteNodeAt: systemId [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: systemId) delete: node.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ result statistics
 ]
 
@@ -135,7 +137,7 @@ FkGraphDb >> deleteNodesLabeled: labelOrLabels where: whereClauseBuilder [
 		match: (CyNode name: node labels: (self labelsFor: labelOrLabels))
 		where: (whereClauseBuilder value: node)
 		delete: node.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ result statistics
 ]
 
@@ -156,22 +158,24 @@ FkGraphDb >> name [
 ]
 
 { #category : 'private' }
-FkGraphDb >> cypherStringFor: aCyQuery [
-	"CyQuery's default delimiter is a bare carriage return, which FalkorDB's Cypher parser
-	rejects between clauses - use a space instead."
+FkGraphDb >> cypherStringFor: aCypherQueryOrString [
+	"A raw Cypher string is answered unchanged. A CyQuery's default delimiter is a bare carriage
+	return, which FalkorDB's Cypher parser rejects between clauses - render it with a space
+	instead."
 
-	aCyQuery delimiter: ' '.
-	^ aCyQuery cypherString
+	aCypherQueryOrString isString ifTrue: [ ^ aCypherQueryOrString ].
+	aCypherQueryOrString delimiter: ' '.
+	^ aCypherQueryOrString cypherString
 ]
 
 { #category : 'querying' }
-FkGraphDb >> runCypher: cypherString [
-	^ self endpoint graphQuery: self name cypher: cypherString
+FkGraphDb >> runCypher: cypherQueryOrString [
+	^ self endpoint graphQuery: self name cypher: (self cypherStringFor: cypherQueryOrString)
 ]
 
 { #category : 'querying' }
-FkGraphDb >> runReadOnlyCypher: cypherString [
-	^ self endpoint graphRoQuery: self name cypher: cypherString
+FkGraphDb >> runReadOnlyCypher: cypherQueryOrString [
+	^ self endpoint graphRoQuery: self name cypher: (self cypherStringFor: cypherQueryOrString)
 ]
 
 { #category : 'actions-nodes' }
@@ -185,7 +189,7 @@ FkGraphDb >> mergeNodeLabeled: labelOrLabels properties: props [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n labels: (self labelsFor: labelOrLabels) props: props.
 	query := CyQuery statements: { CyMerge of: node. CyReturn of: n }.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ self firstNodeOrNilFrom: result
 ]
 
@@ -200,7 +204,7 @@ FkGraphDb >> nodeAt: systemId [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: systemId) return: node.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ self firstNodeOrNilFrom: result
 ]
 
@@ -210,7 +214,7 @@ FkGraphDb >> nodeAt: systemId mergeProperties: argsDict [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: systemId) set: (n addAll: argsDict).
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ result statistics
 ]
 
@@ -220,7 +224,7 @@ FkGraphDb >> nodeAt: systemId properties: argsDict [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: systemId) set: (n to: argsDict).
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ result statistics
 ]
 
@@ -230,7 +234,7 @@ FkGraphDb >> nodeAt: systemId propertyAt: key put: value [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: systemId) set: { (n @ key) to: value }.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ result statistics
 ]
 
@@ -252,7 +256,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder [
 		match: (CyNode name: node labels: (self labelsFor: labelOrLabels))
 		where: (whereClauseBuilder value: node)
 		return: node.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ self nodesFrom: result
 ]
 
@@ -267,7 +271,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder orderBy: orde
 		orderBy: orderByClause
 		skip: skip
 		limit: limit.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ self nodesFrom: result
 ]
 
@@ -281,7 +285,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder skip: skip li
 		return: node
 		skip: skip
 		limit: limit.
-	result := self runCypher: (self cypherStringFor: query).
+	result := self runCypher: query.
 	^ self nodesFrom: result
 ]
 

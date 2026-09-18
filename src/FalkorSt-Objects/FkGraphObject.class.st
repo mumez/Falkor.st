@@ -16,8 +16,7 @@ Responsibility:
 
 Collaborators:
 - FkGraphDb: runs the Cypher (built with SCypher's CyQuery plus my subclass's pattern element) my
-  mutating operations need, and supplies #cypherStringFor: to render the CyQuery with a
-  FalkorDB-safe delimiter before it is run
+  mutating operations need
 - FkGraphDbError: signaled by #reload when the object I was tracking no longer exists
 
 Public API and Key Messages:
@@ -65,7 +64,7 @@ FkGraphObject >> delete [
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) delete: element.
-	self db runCypher: (self db cypherStringFor: query)
+	self db runCypher: query
 ]
 
 { #category : 'accessing' }
@@ -97,7 +96,7 @@ FkGraphObject >> propertyAt: key put: value [
 		match: element
 		where: (n getId equals: self id)
 		set: { (n @ key) to: value }.
-	self db runCypher: (self db cypherStringFor: query).
+	self db runCypher: query.
 	self reload
 ]
 
@@ -117,7 +116,7 @@ FkGraphObject >> reload [
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) return: n.
-	result := self db runCypher: (self db cypherStringFor: query).
+	result := self db runCypher: query.
 	result records ifEmpty: [
 		^ FkGraphDbError noSuchObject signal: 'No graph object found for id ' , self id printString ].
 	rawGraphObject := result records first first
