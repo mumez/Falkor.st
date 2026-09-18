@@ -305,7 +305,7 @@ FkGraphDb >> firstRelationshipFromCreatePathQuery: query returning: r [
 
 	| result |
 	(query statements last isKindOf: CyReturn)
-		ifFalse: [ self error: 'Expected the query''s trailing statement to be a CyReturn' ].
+		ifFalse: [ FkGraphDbError invalidQuery signal: 'Expected the query''s trailing statement to be a CyReturn' ].
 	query statements removeLast.
 	query addReturn: r.
 	result := self runCypher: query.

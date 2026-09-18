@@ -12,6 +12,8 @@ Public API and Key Messages:
 - FkGraphDbError class >> kind: aSymbol - creates an instance with the given #kind
 - FkGraphDbError class >> noSuchObject - a #NoSuchObject-kind error, signaled when a MATCH-by-id
   query answers no records for a graph object expected to still exist
+- FkGraphDbError class >> invalidQuery - an #InvalidQuery-kind error, signaled when a CyQuery built
+  by the high-level API is not shaped as expected (e.g. a missing trailing CyReturn)
 - #kind / #kind: - the symbolic error category
 "
 Class {
@@ -34,6 +36,11 @@ FkGraphDbError class >> kind: aSymbol [
 { #category : 'instance creation' }
 FkGraphDbError class >> noSuchObject [
 	^ self kind: #NoSuchObject
+]
+
+{ #category : 'instance creation' }
+FkGraphDbError class >> invalidQuery [
+	^ self kind: #InvalidQuery
 ]
 
 { #category : 'accessing' }
