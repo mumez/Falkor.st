@@ -49,6 +49,10 @@ Public API and Key Messages:
 - #deleteNodesLabeled:havingAll: / #deleteNodesLabeled:where: - bulk-delete nodes matching a
   label plus a property-equality filter or an arbitrary where-clause block, answering the query's
   statistics
+- #nodesLabeled:having:value: - shortcut for #nodesLabeled:where: with a single property-equality
+  filter
+- #nodeAt:removePropertyAt: - REMOVE a single property by id without fetching the node first,
+  answering the query's statistics
 - #createRelationshipTyped:fromNodeId:toNodeId:properties: / #createInRelationshipTyped:.../
   #createOutRelationshipTyped:... - CREATE a relationship between two existing nodes by id
   (fromNodeId -> toNodeId / toNodeId -> fromNodeId / fromNodeId -> toNodeId respectively -
@@ -63,8 +67,16 @@ Public API and Key Messages:
 - #relationshipAt:properties: / #relationshipAt:mergeProperties: - SET a relationship's whole
   property map by id without fetching it first, bound as a single #runCypher:arguments: parameter,
   answering the query's statistics
+- #relationshipAt:removePropertyAt: - REMOVE a single property by id without fetching the
+  relationship first, answering the query's statistics
 - #deleteRelationshipAt: - MATCH a relationship by id and DELETE it, answering the query's
   statistics
+- #relationshipsTyped: / #relationshipsTyped:having:value: / #relationshipsTyped:havingAll: /
+  #relationshipsTyped:where: - MATCH relationships of the given type(s) anywhere in the graph,
+  optionally filtered by a single property-equality shortcut, property equality across a whole
+  assoc array, or an arbitrary where-clause block, answering a collection of FkGraphRelationship
+- #relationshipsTyped:where:orderBy:skip:limit: - like #relationshipsTyped:where: with
+  ORDER BY/SKIP/LIMIT applied
 - #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: -
   MATCH one-hop paths of the given relationship type(s)/direction from a start node id to end nodes
   matching labels/properties, running the query and applying the given returner block to each
@@ -130,6 +142,14 @@ Implementation Points:
   pathProcessIn: nil and exposes returnIn: to the caller instead, relying on the query builder's
   fixed 's'/'r'/'e'/'p' Cypher variable-naming convention (start node/relationship/end node/whole
   path) for the caller's returnIn: block to target.
+- #relationshipsTyped:where:orderBy:skip:limit: mirrors N4GraphDb's method of the same name
+  (../Neo4reSt, reference-only): MATCH an anonymous directed pattern (unnamed start/end nodes,
+  named relationship 'r'), apply the where-clause block and RETURN r directly (not a whole path),
+  then wrap each raw result relationship as an FkGraphRelationship via the private
+  #relationshipsFrom: helper - analogous to #nodesFrom: for nodes. Unlike N4GraphDb, orderByClause
+  is passed straight through rather than invoked as a block, matching
+  #nodesLabeled:where:orderBy:skip:limit:'s own calling convention for CyQuery class >>
+  match:where:return:orderBy:skip:limit:.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -266,6 +286,54 @@ FkGraphDb >> deleteRelationshipAt: systemId [
 	r := 'r' asCypherIdentifier.
 	rel := CyRelationship start: s end: e name: r.
 	query := CyQuery match: rel where: (r getId equals: systemId) delete: r.
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes [
+	^ self relationshipsTyped: typeOrTypes havingAll: #()
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes having: key value: value [
+	^ self relationshipsTyped: typeOrTypes where: [ :r | (r @ key) equals: value ]
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes havingAll: assocArray [
+	^ self relationshipsTyped: typeOrTypes where: [ :r | r havingAll: assocArray ]
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder [
+	^ self relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: nil skip: nil limit: nil
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: orderByClause skip: skip limit: limit [
+	| r rel query result |
+	r := 'r' asCypherIdentifier.
+	rel := r rel: typeOrTypes props: #().
+	query := CyQuery
+		match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode)
+		where: (whereClauseBuilder value: r)
+		return: r
+		orderBy: orderByClause
+		skip: skip
+		limit: limit.
+	result := self runCypher: query.
+	^ self relationshipsFrom: result
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipAt: systemId removePropertyAt: key [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery match: rel where: (r getId equals: systemId) remove: (r @ key).
 	result := self runCypher: query.
 	^ result statistics
 ]
@@ -418,6 +486,11 @@ FkGraphDb >> firstRelationshipOrNilFrom: aFkQueryResult [
 	aFkQueryResult records ifEmpty: [ ^ nil ].
 	path := aFkQueryResult records first first.
 	^ FkGraphRelationship on: path relationships first in: self
+]
+
+{ #category : 'private' }
+FkGraphDb >> relationshipsFrom: aFkQueryResult [
+	^ aFkQueryResult records collect: [ :record | FkGraphRelationship on: record first in: self ]
 ]
 
 { #category : 'private' }
@@ -605,8 +678,23 @@ FkGraphDb >> nodeAt: systemId propertyAt: key put: value [
 ]
 
 { #category : 'actions-nodes' }
+FkGraphDb >> nodeAt: systemId removePropertyAt: key [
+	| n node query result |
+	n := 'n' asCypherIdentifier.
+	node := CyNode name: n.
+	query := CyQuery match: node where: (n getId equals: systemId) remove: (n @ key).
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'actions-nodes' }
 FkGraphDb >> nodesLabeled: labelOrLabels [
 	^ self nodesLabeled: labelOrLabels havingAll: #()
+]
+
+{ #category : 'actions-nodes' }
+FkGraphDb >> nodesLabeled: labelOrLabels having: key value: value [
+	^ self nodesLabeled: labelOrLabels where: [ :node | (node @ key) equals: value ]
 ]
 
 { #category : 'actions-nodes' }
