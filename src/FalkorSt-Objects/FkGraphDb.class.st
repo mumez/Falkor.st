@@ -119,14 +119,17 @@ Implementation Points:
   pull startNode/endNode/relationships already as FkGraphNode/FkGraphRelationship without any
   further wrapping step.
 - #existsOneHopPathsTyped:... and the returnIn:-taking #oneHopPathsTyped:...returnIn:returning:
-  mirror N4GraphDb (../Neo4reSt, reference-only): both build their query via SCypher's
-  CyQuery class >> matchPathWithRelationshipsOfTypes:havingAll:fromNodeAt:endNodeIn:pathIn:whereIn:
-  pathProcessIn:returnIn:. #existsOneHopPathsTyped:... uses pathProcessIn: [:path | path count > 0]
-  and returnIn: [:r | r] so FalkorDB answers a bare Boolean as the first (and only) record value.
-  #oneHopPathsTyped:...returnIn:returning: leaves pathProcessIn: nil and exposes returnIn: to the
-  caller instead, relying on the query builder's fixed 's'/'r'/'e'/'p' Cypher variable-naming
-  convention (start node/relationship/end node/whole path) for the caller's returnIn: block to
-  target.
+  mirror N4GraphDb (../Neo4reSt, reference-only): both delegate their query-building to the
+  private #oneHopPathsQueryResultFor:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:
+  pathProcessIn:returnIn:, which wraps SCypher's CyQuery class >>
+  matchPathWithRelationshipsOfTypes:havingAll:fromNodeAt:endNodeIn:pathIn:whereIn:pathProcessIn:
+  returnIn: and runs it - the direction-block selection and query construction live in that one
+  place so both callers stay in sync. #existsOneHopPathsTyped:... passes
+  pathProcessIn: [:path | path count > 0] and returnIn: [:r | r] so FalkorDB answers a bare
+  Boolean as the first (and only) record value. #oneHopPathsTyped:...returnIn:returning: passes
+  pathProcessIn: nil and exposes returnIn: to the caller instead, relying on the query builder's
+  fixed 's'/'r'/'e'/'p' Cypher variable-naming convention (start node/relationship/end node/whole
+  path) for the caller's returnIn: block to target.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -347,26 +350,24 @@ FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeI
 	returnBlock changes what the record's first value actually is, and returner must wrap that
 	value into the appropriate Fk* type itself."
 
-	| pathBlock query result |
-	pathBlock := [ :startNode :rel :endNode | startNode - rel - endNode ].
-	direction == #in ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode <- rel - endNode ] ].
-	direction == #out ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode - rel -> endNode ] ].
-	query := CyQuery
-		matchPathWithRelationshipsOfTypes: typeOrTypes
+	| result |
+	result := self
+		oneHopPathsQueryResultFor: typeOrTypes
+		direction: direction
+		from: startNodeId
 		havingAll: relProps
-		fromNodeAt: startNodeId
-		endNodeIn: [ :e | e node: labels props: endNodeProps ]
-		pathIn: pathBlock
+		endNodeWithLabels: labels
+		havingAll: endNodeProps
 		whereIn: whereClauseBuilder
+		pathProcessIn: nil
 		returnIn: returnBlock.
-	result := self runCypher: query.
 	returnBlock ifNil: [ ^ result records collect: [ :record | returner value: (FkGraphPath on: record first in: self) ] ].
 	^ result records collect: [ :record | returner value: record first ]
 ]
 
-{ #category : 'actions-paths' }
-FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder [
-	| pathBlock query result |
+{ #category : 'private' }
+FkGraphDb >> oneHopPathsQueryResultFor: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder pathProcessIn: processBlock returnIn: returnBlock [
+	| pathBlock query |
 	pathBlock := [ :startNode :rel :endNode | startNode - rel - endNode ].
 	direction == #in ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode <- rel - endNode ] ].
 	direction == #out ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode - rel -> endNode ] ].
@@ -377,9 +378,25 @@ FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: star
 		endNodeIn: [ :e | e node: labels props: endNodeProps ]
 		pathIn: pathBlock
 		whereIn: whereClauseBuilder
+		pathProcessIn: processBlock
+		returnIn: returnBlock.
+	^ self runCypher: query
+]
+
+{ #category : 'actions-paths' }
+FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder [
+	| result |
+	result := self
+		oneHopPathsQueryResultFor: typeOrTypes
+		direction: direction
+		from: startNodeId
+		havingAll: relProps
+		endNodeWithLabels: labels
+		havingAll: endNodeProps
+		whereIn: whereClauseBuilder
 		pathProcessIn: [ :path | path count > 0 ]
 		returnIn: [ :r | r ].
-	result := self runCypher: query.
+	result records ifEmpty: [ ^ false ].
 	^ result records first first
 ]
 

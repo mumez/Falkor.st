@@ -107,11 +107,35 @@ FkGraphNodeTest >> testRelationshipsTypedEndNodeHavingKeyValueFiltersByEndNodePr
 ]
 
 { #category : 'tests' }
+FkGraphNodeTest >> testRelationshipsTypedWhereFiltersUsingAnArbitraryWhereClauseBuilder [
+	| alice |
+	alice := (self createAliceWithBobAndCarolIn: self db) first.
+	self assert: (alice relationshipsTyped: 'KNOWS' where: [ :start :rel :end | (rel @ 'since') equals: 2020 ]) size equals: 1.
+	self assert: (alice relationshipsTyped: 'KNOWS' where: [ :start :rel :end | (rel @ 'since') equals: 1999 ]) isEmpty
+]
+
+{ #category : 'tests' }
 FkGraphNodeTest >> testExistsRelationshipTypedAnswersTrueForExistingTypeAndFalseForMissingType [
 	| alice |
 	alice := (self createAliceWithBobAndCarolIn: self db) first.
 	self assert: (alice existsRelationshipTyped: 'KNOWS').
 	self deny: (alice existsRelationshipTyped: 'MISSING')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testExistsRelationshipTypedHavingKeyValueFiltersByRelationshipProperty [
+	| alice |
+	alice := (self createAliceWithBobAndCarolIn: self db) first.
+	self assert: (alice existsRelationshipTyped: 'KNOWS' having: 'since' value: 2020).
+	self deny: (alice existsRelationshipTyped: 'KNOWS' having: 'since' value: 1999)
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testExistsRelationshipTypedEndNodeHavingKeyValueFiltersByEndNodeProperty [
+	| alice |
+	alice := (self createAliceWithBobAndCarolIn: self db) first.
+	self assert: (alice existsRelationshipTyped: 'KNOWS' endNodeHaving: 'name' value: 'Bob').
+	self deny: (alice existsRelationshipTyped: 'KNOWS' endNodeHaving: 'name' value: 'Nobody')
 ]
 
 { #category : 'tests' }
