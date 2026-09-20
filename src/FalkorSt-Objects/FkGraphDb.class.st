@@ -149,7 +149,10 @@ Implementation Points:
   #relationshipsFrom: helper - analogous to #nodesFrom: for nodes. Unlike N4GraphDb, orderByClause
   is passed straight through rather than invoked as a block, matching
   #nodesLabeled:where:orderBy:skip:limit:'s own calling convention for CyQuery class >>
-  match:where:return:orderBy:skip:limit:.
+  match:where:return:orderBy:skip:limit:. Callers must pass a raw order-by clause expression (e.g.
+  built with CyExpression's #asc/#desc) - CyQuery's builder only applies orderBy when it is neither
+  nil nor a block, so passing a whereClauseBuilder-style block here is silently ignored rather than
+  raising an error.
 "
 Class {
 	#name : 'FkGraphDb',
