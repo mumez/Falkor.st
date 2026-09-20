@@ -510,3 +510,75 @@ FkGraphDbTest >> testOneHopPathsTypedDirectionOutReturningEndNodeAnswersWrappedE
 	self assert: endNodes first class equals: FkGraphNode.
 	self assert: (endNodes first propertyAt: 'name') equals: 'Bob'
 ]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExistsOneHopPathsTypedDirectionOutAnswersTrueWhenMatchingPathExists [
+	| aliceAndBob alice |
+	aliceAndBob := self createAliceKnowsBobIn: self db.
+	alice := aliceAndBob first.
+	self assert: (self db
+		existsOneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ])
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExistsOneHopPathsTypedDirectionOutAnswersFalseWhenNoMatchingPathExists [
+	| alice |
+	alice := (self db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }).
+	self deny: (self db
+		existsOneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ])
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExistsOneHopPathsTypedDirectionOutAnswersFalseWhenWhereClauseExcludesMatch [
+	| aliceAndBob alice |
+	aliceAndBob := self createAliceKnowsBobIn: self db.
+	alice := aliceAndBob first.
+	self deny: (self db
+		existsOneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | (e @ 'name') equals: 'Nobody' ])
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExistsOneHopPathsTypedDirectionFromWhereInConvenienceMatchesFullVersionWithEmptyFilters [
+	| aliceAndBob alice |
+	aliceAndBob := self createAliceKnowsBobIn: self db.
+	alice := aliceAndBob first.
+	self assert: (self db existsOneHopPathsTyped: 'KNOWS' direction: #out from: alice id whereIn: [ :s :r :e | nil ]).
+	self deny: (self db existsOneHopPathsTyped: 'MISSING' direction: #out from: alice id whereIn: [ :s :r :e | nil ])
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testOneHopPathsTypedReturnInNarrowedToEndNodeAnswersWrappedEndNodes [
+	| db endNodes |
+	db := self db.
+	endNodes := db
+		oneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: (self createAliceKnowsBobIn: db) first id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ]
+		returnIn: [ :ret | ret items: (CyObjects withAll: { 'e' asCypherIdentifier }) ]
+		returning: [ :endNode | FkGraphNode on: endNode in: db ].
+	self assert: endNodes size equals: 1.
+	self assert: endNodes first class equals: FkGraphNode.
+	self assert: (endNodes first propertyAt: 'name') equals: 'Bob'
+]
