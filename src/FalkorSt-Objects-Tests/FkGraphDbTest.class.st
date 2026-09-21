@@ -14,6 +14,9 @@ Coverage:
 - graph-object-api spec: ""Creating and merging relationships""
 - graph-object-api spec: ""Finding relationships by id""
 - graph-object-api spec: ""Mutating and deleting relationships by id""
+- graph-object-api spec: ""Counting nodes/relationships and listing distinct labels/types""
+- graph-object-api spec: ""Bulk-deleting nodes, relationships, or the whole graph""
+- graph-object-api spec: ""Finding orphaned nodes""
 "
 Class {
 	#name : 'FkGraphDbTest',
@@ -237,6 +240,17 @@ FkGraphDbTest >> testDeleteNodeAtRemovesTheNode [
 	created := db createNodeLabeled: 'Person'.
 	db deleteNodeAt: created id.
 	self assert: (db nodeAt: created id) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteNodeAtWithRelationsRemovesTheNodeAndItsRelationships [
+	| db aliceAndBob alice |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	alice := aliceAndBob first.
+	db deleteNodeAt: alice id withRelations: true.
+	self assert: (db nodeAt: alice id) isNil.
+	self assert: db countRelationships equals: 0
 ]
 
 { #category : 'tests' }
@@ -692,4 +706,129 @@ FkGraphDbTest >> testOneHopPathsTypedReturnInNarrowedToEndNodeAnswersWrappedEndN
 	self assert: endNodes size equals: 1.
 	self assert: endNodes first class equals: FkGraphNode.
 	self assert: (endNodes first propertyAt: 'name') equals: 'Bob'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testAllLabelsAnswersEveryDistinctLabelInTheGraph [
+	| db labels |
+	db := self db.
+	db createNodeLabeled: 'Person'.
+	db createNodeLabeled: 'Person'.
+	db createNodeLabeled: 'Company'.
+	labels := db allLabels.
+	self assert: labels asSet equals: #('Person' 'Company') asSet
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testAllRelationshipTypesAnswersEveryDistinctTypeInTheGraph [
+	| db aliceAndBob carol |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	db createOutRelationshipTyped: 'LIKES' fromNodeId: aliceAndBob first id toNodeId: carol id properties: #().
+	self assert: db allRelationshipTypes asSet equals: #('KNOWS' 'LIKES') asSet
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCountNodesAnswersTheTotalNodeCount [
+	| db |
+	db := self db.
+	db createNodeLabeled: 'Person'.
+	db createNodeLabeled: 'Company'.
+	self assert: db countNodes equals: 2
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCountNodesLabeledAnswersTheCountForTheGivenLabel [
+	| db |
+	db := self db.
+	db createNodeLabeled: 'Person'.
+	db createNodeLabeled: 'Person'.
+	db createNodeLabeled: 'Company'.
+	self assert: (db countNodesLabeled: 'Person') equals: 2
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCountRelationshipsAnswersTheTotalRelationshipCount [
+	| db aliceAndBob carol |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	db createOutRelationshipTyped: 'LIKES' fromNodeId: aliceAndBob first id toNodeId: carol id properties: #().
+	self assert: db countRelationships equals: 2
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCountRelationshipsTypedAnswersTheCountForTheGivenType [
+	| db aliceAndBob carol |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	db createOutRelationshipTyped: 'LIKES' fromNodeId: aliceAndBob first id toNodeId: carol id properties: #().
+	self assert: (db countRelationshipsTyped: 'KNOWS') equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteAllRemovesAllNodesAndRelationships [
+	| db |
+	db := self db.
+	self createAliceKnowsBobIn: db.
+	db deleteAll.
+	self assert: db countNodes equals: 0.
+	self assert: db countRelationships equals: 0
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteAllNodesRemovesAllNodesAndTheirRelationships [
+	| db |
+	db := self db.
+	self createAliceKnowsBobIn: db.
+	db deleteAllNodes.
+	self assert: db countNodes equals: 0.
+	self assert: db countRelationships equals: 0
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteAllRelationshipsRemovesRelationshipsButKeepsNodes [
+	| db |
+	db := self db.
+	self createAliceKnowsBobIn: db.
+	db deleteAllRelationships.
+	self assert: db countNodes equals: 2.
+	self assert: db countRelationships equals: 0
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteRelationshipsTypedRemovesOnlyMatchingTypeRelationships [
+	| db aliceAndBob carol |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	db createOutRelationshipTyped: 'LIKES' fromNodeId: aliceAndBob first id toNodeId: carol id properties: #().
+	db deleteRelationshipsTyped: 'KNOWS'.
+	self assert: (db countRelationshipsTyped: 'KNOWS') equals: 0.
+	self assert: (db countRelationshipsTyped: 'LIKES') equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDeleteRelationshipsTypedHavingAllRemovesOnlyMatchingRelationships [
+	| db alice bob carol |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	carol := db createNodeLabeled: 'Person'.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: { 'since' -> 2020 }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: bob id toNodeId: carol id properties: { 'since' -> 2021 }.
+	db deleteRelationshipsTyped: 'KNOWS' havingAll: { 'since' -> 2020 }.
+	self assert: (db countRelationshipsTyped: 'KNOWS') equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testOrphanedNodesAnswersOnlyNodesWithNoRelationships [
+	| db aliceAndBob lonely |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	lonely := db createNodeLabeled: 'Person' properties: { 'name' -> 'Lonely' }.
+	self assert: db orphanedNodes size equals: 1.
+	self assert: (db orphanedNodes first propertyAt: 'name') equals: 'Lonely'
 ]
