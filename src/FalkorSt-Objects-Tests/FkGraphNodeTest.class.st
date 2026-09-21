@@ -263,3 +263,59 @@ FkGraphNodeTest >> testWritingAPropertyUpdatesTheGraphAndRefreshesLocalState [
 	self assert: ((self endpoint graphQuery: self graphName cypher: 'MATCH (p) RETURN p.age')
 		records first first) equals: 31
 ]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testAddLabelAddsASingleLabelVisibleViaLabelsAndAllLabels [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	person addLabel: 'Employee'.
+	self assertCollection: person labels asArray equals: #('Person' 'Employee').
+	self assertCollection: person allLabels asArray equals: #('Person' 'Employee')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testAddLabelsAddsMultipleLabelsVisibleViaLabelsAndAllLabels [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	person addLabels: #('Employee' 'Manager').
+	self assertCollection: person labels asArray equals: #('Person' 'Employee' 'Manager').
+	self assertCollection: person allLabels asArray equals: #('Person' 'Employee' 'Manager')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testRemoveLabelRemovesASingleLabelVisibleViaLabelsAndAllLabels [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: #('Person' 'Employee') properties: { 'name' -> 'Alice' }.
+	person removeLabel: 'Employee'.
+	self assertCollection: person labels asArray equals: #('Person').
+	self assertCollection: person allLabels asArray equals: #('Person')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testRemoveLabelsRemovesMultipleLabelsVisibleViaLabelsAndAllLabels [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: #('Person' 'Employee' 'Manager') properties: { 'name' -> 'Alice' }.
+	person removeLabels: #('Employee' 'Manager').
+	self assertCollection: person labels asArray equals: #('Person').
+	self assertCollection: person allLabels asArray equals: #('Person')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testLabelAnswersTheFirstLabelWhenLabelsExist [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: #('Person' 'Employee') properties: { 'name' -> 'Alice' }.
+	self assert: person label equals: 'Person'
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testLabelAnswersNilWhenNoLabelsExist [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: #() properties: { 'name' -> 'Alice' }.
+	self assert: person label isNil
+]

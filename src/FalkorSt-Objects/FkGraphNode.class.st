@@ -8,6 +8,8 @@ Responsibility:
 - Delegate #labels to my wrapped FkNode
 - Supply the CyNode pattern element FkGraphObject's #delete / #propertyAt:put: / #reload match
   myself by id through
+- SET/REMOVE my labels in FalkorDB, then reload the wrapped FkNode, mirroring #propertyAt:put:
+- Re-query FalkorDB for my current labels (#allLabels), independent of the locally-cached #labels
 - Fetch my one-hop relationships/end nodes/paths (in any direction, filtered by type/property/
   end-node label, or by an arbitrary where-clause block) by delegating to my FkGraphDb's
   #oneHopPathsTyped:direction:from:... family
@@ -28,7 +30,11 @@ Public API and Key Messages:
 - FkGraphNode class >> on:in: - wraps an FkNode with the FkGraphDb it was fetched through
   (inherited from FkGraphObject)
 - #id / #labels / #properties / #propertyAt: - delegate to the wrapped FkNode
+- #label - the first of my locally-cached #labels, or nil if I have none
 - #propertyAt:put: - SETs the property in FalkorDB, then reloads the wrapped FkNode
+- #addLabel: / #addLabels: - SET one or more labels in FalkorDB, then reload the wrapped FkNode
+- #removeLabel: / #removeLabels: - REMOVE one or more labels in FalkorDB, then reload the wrapped FkNode
+- #allLabels - re-query FalkorDB for my current labels rather than reading the local cache
 - #delete - DELETEs the node in FalkorDB
 - #rawNode - the wrapped FkNode (an alias for the inherited #rawGraphObject)
 - #relationships / #relationshipsTyped: / #relationshipsTyped:having:value: /
@@ -75,6 +81,31 @@ Class {
 	#category : 'FalkorSt-Objects',
 	#package : 'FalkorSt-Objects'
 }
+
+{ #category : 'actions-labels' }
+FkGraphNode >> addLabel: label [
+	^ self addLabels: { label }
+]
+
+{ #category : 'actions-labels' }
+FkGraphNode >> addLabels: labels [
+	| n element query |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery match: element where: (n getId equals: self id) set: (n labels: labels).
+	self db runCypher: query.
+	self reload
+]
+
+{ #category : 'accessing' }
+FkGraphNode >> allLabels [
+	| n element query result |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery match: element where: (n getId equals: self id) return: n labels.
+	result := self db runReadOnlyCypher: query.
+	^ result records first first
+]
 
 { #category : 'accessing-relationships-existence' }
 FkGraphNode >> existsInRelationshipTyped: typeOrTypes [
@@ -210,6 +241,11 @@ FkGraphNode >> inRelationshipsTyped: typeOrTypes where: whereClauseBuilder [
 ]
 
 { #category : 'accessing' }
+FkGraphNode >> label [
+	^ self labels ifEmpty: [ nil ] ifNotEmpty: [ :labels | labels first ]
+]
+
+{ #category : 'accessing' }
 FkGraphNode >> labels [
 	^ self rawGraphObject labels
 ]
@@ -321,6 +357,21 @@ FkGraphNode >> outRelationshipsTyped: typeOrTypes where: whereClauseBuilder [
 { #category : 'accessing' }
 FkGraphNode >> rawNode [
 	^ self rawGraphObject
+]
+
+{ #category : 'actions-labels' }
+FkGraphNode >> removeLabel: label [
+	^ self removeLabels: { label }
+]
+
+{ #category : 'actions-labels' }
+FkGraphNode >> removeLabels: labels [
+	| n element query |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery match: element where: (n getId equals: self id) remove: (n labels: labels).
+	self db runCypher: query.
+	self reload
 ]
 
 { #category : 'relationships' }
