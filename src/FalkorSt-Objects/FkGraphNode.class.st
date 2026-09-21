@@ -9,7 +9,7 @@ Responsibility:
 - Supply the CyNode pattern element FkGraphObject's #delete / #propertyAt:put: / #reload match
   myself by id through
 - SET/REMOVE my labels in FalkorDB, then reload the wrapped FkNode, mirroring #propertyAt:put:
-- Re-query FalkorDB for my current labels (#allLabels), independent of the locally-cached #labels
+- Re-query FalkorDB for my current labels (#labelsFromDb), independent of the locally-cached #labels
 - Fetch my one-hop relationships/end nodes/paths (in any direction, filtered by type/property/
   end-node label, or by an arbitrary where-clause block) by delegating to my FkGraphDb's
   #oneHopPathsTyped:direction:from:... family
@@ -34,7 +34,10 @@ Public API and Key Messages:
 - #propertyAt:put: - SETs the property in FalkorDB, then reloads the wrapped FkNode
 - #addLabel: / #addLabels: - SET one or more labels in FalkorDB, then reload the wrapped FkNode
 - #removeLabel: / #removeLabels: - REMOVE one or more labels in FalkorDB, then reload the wrapped FkNode
-- #allLabels - re-query FalkorDB for my current labels rather than reading the local cache
+- #labelsFromDb - re-query FalkorDB for my current labels rather than reading the local #labels
+  cache; named distinctly from FkGraphDb's own #allLabels (which means every distinct label across
+  the whole graph, an unrelated concept) and from #labels (unrelated to caching) so the name itself
+  signals the DB-vs-cache distinction; answers an empty collection (not nil) for a labelless node
 - #delete - DELETEs the node in FalkorDB
 - #rawNode - the wrapped FkNode (an alias for the inherited #rawGraphObject)
 - #relationships / #relationshipsTyped: / #relationshipsTyped:having:value: /
@@ -61,6 +64,14 @@ Public API and Key Messages:
   relationship to another FkGraphNode, answering it wrapped as an FkGraphRelationship or nil
 
 Implementation Points:
+- #addLabels: and #removeLabels: share their match/where/run/reload skeleton through the private
+  #changeLabels:using: helper - the block passed in only picks whether the label change is
+  appended to the query via CyQuery's #addSet: or #addRemove:, since #labels: (SCypher's
+  CyIdentifier >> labels:) answers the same CySetItemExpression either way.
+- #labelsFromDb (empty collection for a labelless node) and #label (nil for a labelless node) have
+  deliberately different empty-case shapes: #label mirrors N4Node's single-value convention, while
+  #labelsFromDb mirrors #labels'/#allLabels'-style collection accessors elsewhere in this project,
+  none of which answer nil for ""no results"" - see the covering tests for both cases.
 - Every relationship/path/existence accessor is built only on top of FkGraphDb's existing
   #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: and
   #existsOneHopPathsTyped:direction:from:whereIn: - I never build Cypher directly myself, mirroring
@@ -89,16 +100,22 @@ FkGraphNode >> addLabel: label [
 
 { #category : 'actions-labels' }
 FkGraphNode >> addLabels: labels [
+	^ self changeLabels: labels using: [ :query :setItem | query addSet: setItem ]
+]
+
+{ #category : 'private' }
+FkGraphNode >> changeLabels: labels using: addStatementBlock [
 	| n element query |
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
-	query := CyQuery match: element where: (n getId equals: self id) set: (n labels: labels).
+	query := CyQuery match: element where: (n getId equals: self id).
+	addStatementBlock value: query value: (n labels: labels).
 	self db runCypher: query.
 	self reload
 ]
 
 { #category : 'accessing' }
-FkGraphNode >> allLabels [
+FkGraphNode >> labelsFromDb [
 	| n element query result |
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
@@ -366,12 +383,7 @@ FkGraphNode >> removeLabel: label [
 
 { #category : 'actions-labels' }
 FkGraphNode >> removeLabels: labels [
-	| n element query |
-	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
-	query := CyQuery match: element where: (n getId equals: self id) remove: (n labels: labels).
-	self db runCypher: query.
-	self reload
+	^ self changeLabels: labels using: [ :query :setItem | query addRemove: setItem ]
 ]
 
 { #category : 'relationships' }

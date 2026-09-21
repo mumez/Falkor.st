@@ -14,6 +14,7 @@ Coverage:
 - graph-object-api spec: ""Fetching one-hop paths in either direction""
 - graph-object-api spec: ""Creating/merging an outgoing relationship to another node""
 - graph-object-api spec: ""Collecting the distinct relationship types of a node""
+- graph-object-api spec: ""Adding/removing labels and re-querying them from the database""
 "
 Class {
 	#name : 'FkGraphNodeTest',
@@ -265,43 +266,43 @@ FkGraphNodeTest >> testWritingAPropertyUpdatesTheGraphAndRefreshesLocalState [
 ]
 
 { #category : 'tests' }
-FkGraphNodeTest >> testAddLabelAddsASingleLabelVisibleViaLabelsAndAllLabels [
+FkGraphNodeTest >> testAddLabelAddsASingleLabelVisibleViaLabelsAndLabelsFromDb [
 	| db person |
 	db := self db.
 	person := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
 	person addLabel: 'Employee'.
 	self assertCollection: person labels asArray equals: #('Person' 'Employee').
-	self assertCollection: person allLabels asArray equals: #('Person' 'Employee')
+	self assertCollection: person labelsFromDb asArray equals: #('Person' 'Employee')
 ]
 
 { #category : 'tests' }
-FkGraphNodeTest >> testAddLabelsAddsMultipleLabelsVisibleViaLabelsAndAllLabels [
+FkGraphNodeTest >> testAddLabelsAddsMultipleLabelsVisibleViaLabelsAndLabelsFromDb [
 	| db person |
 	db := self db.
 	person := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
 	person addLabels: #('Employee' 'Manager').
 	self assertCollection: person labels asArray equals: #('Person' 'Employee' 'Manager').
-	self assertCollection: person allLabels asArray equals: #('Person' 'Employee' 'Manager')
+	self assertCollection: person labelsFromDb asArray equals: #('Person' 'Employee' 'Manager')
 ]
 
 { #category : 'tests' }
-FkGraphNodeTest >> testRemoveLabelRemovesASingleLabelVisibleViaLabelsAndAllLabels [
+FkGraphNodeTest >> testRemoveLabelRemovesASingleLabelVisibleViaLabelsAndLabelsFromDb [
 	| db person |
 	db := self db.
 	person := db createNodeLabeled: #('Person' 'Employee') properties: { 'name' -> 'Alice' }.
 	person removeLabel: 'Employee'.
 	self assertCollection: person labels asArray equals: #('Person').
-	self assertCollection: person allLabels asArray equals: #('Person')
+	self assertCollection: person labelsFromDb asArray equals: #('Person')
 ]
 
 { #category : 'tests' }
-FkGraphNodeTest >> testRemoveLabelsRemovesMultipleLabelsVisibleViaLabelsAndAllLabels [
+FkGraphNodeTest >> testRemoveLabelsRemovesMultipleLabelsVisibleViaLabelsAndLabelsFromDb [
 	| db person |
 	db := self db.
 	person := db createNodeLabeled: #('Person' 'Employee' 'Manager') properties: { 'name' -> 'Alice' }.
 	person removeLabels: #('Employee' 'Manager').
 	self assertCollection: person labels asArray equals: #('Person').
-	self assertCollection: person allLabels asArray equals: #('Person')
+	self assertCollection: person labelsFromDb asArray equals: #('Person')
 ]
 
 { #category : 'tests' }
@@ -318,4 +319,13 @@ FkGraphNodeTest >> testLabelAnswersNilWhenNoLabelsExist [
 	db := self db.
 	person := db createNodeLabeled: #() properties: { 'name' -> 'Alice' }.
 	self assert: person label isNil
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testLabelsFromDbAnswersEmptyCollectionWhenNoLabelsExist [
+	| db person |
+	db := self db.
+	person := db createNodeLabeled: #() properties: { 'name' -> 'Alice' }.
+	self assert: person labelsFromDb isNotNil.
+	self assert: person labelsFromDb isEmpty
 ]
