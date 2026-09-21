@@ -1,12 +1,14 @@
 "
-I test FkGraphRelationship's endpoint accessors (#startNode/#endNode/#headNode/#tailNode) against a
-real FalkorDB instance, including the anchor-relative direction convention #headNodeId/#tailNodeId
-depend on.
+I test FkGraphRelationship's endpoint accessors (#startNode/#endNode/#headNode/#tailNode) and
+inherited bulk property mutators against a real FalkorDB instance, including the anchor-relative
+direction convention #headNodeId/#tailNodeId depend on.
 
 Coverage:
 - graph-object-api spec: ""Fetching a relationship's start/end node""
 - graph-object-api spec: ""Resolving head/tail node relative to the traversal anchor""
 - graph-object-api spec: ""A relationship with no known direction signals an error on head/tail""
+- graph-object-api spec: ""Bulk property SET/MERGE/REMOVE on a relationship, inherited from
+  FkGraphObject""
 "
 Class {
 	#name : 'FkGraphRelationshipTest',
@@ -27,6 +29,19 @@ FkGraphRelationshipTest >> createAliceKnowsBobIn: db [
 	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
 	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
 	^ { alice. bob }
+]
+
+{ #category : 'creating' }
+FkGraphRelationshipTest >> createAliceKnowsBobWithSincePropertyIn: db [
+	| alice bob |
+	alice := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
+	db
+		createOutRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: { 'since' -> 2020 }.
+	^ (db relationshipsTyped: 'KNOWS') first
 ]
 
 { #category : 'tests' }
@@ -88,4 +103,29 @@ FkGraphRelationshipTest >> testTailNodeIdSignalsUnknownDirectionWhenDirectionIsN
 		should: [ rel tailNodeId ]
 		raise: FkGraphDbError
 		withExceptionDo: [ :ex | self assert: ex kind equals: #UnknownDirection ]
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testPropertiesReplacesTheWholePropertyMap [
+	| rel |
+	rel := self createAliceKnowsBobWithSincePropertyIn: self db.
+	rel properties: { 'weight' -> 5 }.
+	self assert: rel properties equals: { 'weight' -> 5 } asDictionary
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testMergePropertiesAddsWithoutDroppingExistingKeys [
+	| rel |
+	rel := self createAliceKnowsBobWithSincePropertyIn: self db.
+	rel mergeProperties: { 'weight' -> 5 }.
+	self assert: (rel propertyAt: 'since') equals: 2020.
+	self assert: (rel propertyAt: 'weight') equals: 5
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testRemovePropertyAtRemovesOneKey [
+	| rel |
+	rel := self createAliceKnowsBobWithSincePropertyIn: self db.
+	rel removePropertyAt: 'since'.
+	self assert: (rel propertyAt: 'since') isNil
 ]
