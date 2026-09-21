@@ -23,6 +23,9 @@ Public API and Key Messages:
 - FkGraphObject class >> on:in: - wraps a raw graph value with the FkGraphDb it was fetched through
 - #id / #properties / #propertyAt: - delegate to the wrapped raw value
 - #propertyAt:put: - SETs the property in FalkorDB, then reloads the wrapped raw value
+- #properties: / #mergeProperties: - SET my whole property map (replacing / merging), bound as a
+  single #runCypher:arguments: parameter via my FkGraphDb's #valuesArgumentsFor:, then reload
+- #removePropertyAt: - REMOVEs a single property in FalkorDB, then reload
 - #delete - DELETEs myself in FalkorDB
 
 Implementation Points:
@@ -100,6 +103,32 @@ FkGraphObject >> propertyAt: key put: value [
 	self reload
 ]
 
+{ #category : 'actions' }
+FkGraphObject >> mergeProperties: argsDict [
+	| n element query |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery
+		match: element
+		where: (n getId equals: self id)
+		set: (n addAll: 'values' asCypherParameter).
+	self db runCypher: query arguments: (self db valuesArgumentsFor: argsDict).
+	self reload
+]
+
+{ #category : 'actions' }
+FkGraphObject >> properties: argsDict [
+	| n element query |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery
+		match: element
+		where: (n getId equals: self id)
+		set: (n to: 'values' asCypherParameter).
+	self db runCypher: query arguments: (self db valuesArgumentsFor: argsDict).
+	self reload
+]
+
 { #category : 'accessing' }
 FkGraphObject >> rawGraphObject [
 	^ rawGraphObject
@@ -108,6 +137,16 @@ FkGraphObject >> rawGraphObject [
 { #category : 'private' }
 FkGraphObject >> rawGraphObject: anObject [
 	rawGraphObject := anObject
+]
+
+{ #category : 'actions' }
+FkGraphObject >> removePropertyAt: key [
+	| n element query |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery match: element where: (n getId equals: self id) remove: (n @ key).
+	self db runCypher: query.
+	self reload
 ]
 
 { #category : 'private' }

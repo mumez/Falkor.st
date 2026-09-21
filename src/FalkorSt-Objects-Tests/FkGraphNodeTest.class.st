@@ -266,6 +266,43 @@ FkGraphNodeTest >> testWritingAPropertyUpdatesTheGraphAndRefreshesLocalState [
 ]
 
 { #category : 'tests' }
+FkGraphNodeTest >> testPropertiesReplacesTheWholePropertyMap [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode properties: { 'city' -> 'Berlin' }.
+	self assert: graphNode properties equals: { 'city' -> 'Berlin' } asDictionary
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testMergePropertiesAddsWithoutDroppingExistingKeys [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode mergeProperties: { 'city' -> 'Berlin' }.
+	self assert: (graphNode propertyAt: 'name') equals: 'Alice'.
+	self assert: (graphNode propertyAt: 'age') equals: 30.
+	self assert: (graphNode propertyAt: 'city') equals: 'Berlin'
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testRemovePropertyAtRemovesOneKey [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode removePropertyAt: 'age'.
+	self assert: (graphNode propertyAt: 'age') isNil.
+	self assert: (graphNode propertyAt: 'name') equals: 'Alice'
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testDeleteWithRelationsDeletesTheNodeAndItsRelationships [
+	| people alice |
+	people := self createAliceWithBobAndCarolIn: self db.
+	alice := people first.
+	alice deleteWithRelations.
+	self assert: (self db nodeAt: alice id) isNil.
+	self assert: (self db countRelationships) equals: 0
+]
+
+{ #category : 'tests' }
 FkGraphNodeTest >> testAddLabelAddsASingleLabelVisibleViaLabelsAndLabelsFromDb [
 	| db person |
 	db := self db.
