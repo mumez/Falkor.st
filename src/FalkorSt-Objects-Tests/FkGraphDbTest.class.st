@@ -243,6 +243,17 @@ FkGraphDbTest >> testDeleteNodeAtRemovesTheNode [
 ]
 
 { #category : 'tests' }
+FkGraphDbTest >> testDeleteNodeAtWithRelationsRemovesTheNodeAndItsRelationships [
+	| db aliceAndBob alice |
+	db := self db.
+	aliceAndBob := self createAliceKnowsBobIn: db.
+	alice := aliceAndBob first.
+	db deleteNodeAt: alice id withRelations: true.
+	self assert: (db nodeAt: alice id) isNil.
+	self assert: db countRelationships equals: 0
+]
+
+{ #category : 'tests' }
 FkGraphDbTest >> testDeleteNodeRemovesTheGivenGraphNode [
 	| db created |
 	db := self db.

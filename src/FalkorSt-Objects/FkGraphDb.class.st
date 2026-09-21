@@ -46,7 +46,8 @@ Public API and Key Messages:
   fetching it first, bound as a single #runCypher:arguments: parameter (not inlined into the
   Cypher string), answering the query's statistics
 - #deleteNodeAt: / #deleteNode: - MATCH a node by id (or by an FkGraphNode's id) and DELETE it,
-  answering the query's statistics
+  answering the query's statistics; #deleteNodeAt:withRelations: is the same but also detaches the
+  node's relationships first when the argument is true (#deleteNodeAt: is an alias with false)
 - #deleteNodesLabeled:havingAll: / #deleteNodesLabeled:where: - bulk-delete nodes matching a
   label plus a property-equality filter or an arbitrary where-clause block, answering the query's
   statistics
@@ -107,13 +108,21 @@ Public API and Key Messages:
   count of nodes/relationships, optionally filtered by label(s)/type(s)
 - #deleteAll / #deleteAllNodes / #deleteAllRelationships - bulk-delete everything in the graph,
   only its nodes (detaching their relationships), or only its relationships, answering the query's
-  statistics
-- #deleteRelationshipsTyped: / #deleteRelationshipsTyped:havingAll: - bulk-delete relationships of
-  the given type(s) anywhere in the graph, optionally filtered by property equality, answering the
+  statistics; #deleteAll is an alias for #deleteAllNodes since FalkorDB's plain DELETE already
+  detaches a node's relationships (see Implementation Points)
+- #deleteRelationshipsTyped: / #deleteRelationshipsTyped:havingAll: / #deleteRelationshipsTyped:where: -
+  bulk-delete relationships of the given type(s) anywhere in the graph, optionally filtered by
+  property equality across a whole assoc array or an arbitrary where-clause block, answering the
   query's statistics
 - #orphanedNodes - MATCH nodes with no relationships at all, answering a collection of FkGraphNode
 
 Implementation Points:
+- Unlike Neo4j, FalkorDB's plain DELETE on a node auto-detaches its relationships instead of
+  raising - verified empirically against a real instance. #deleteNodeAt: (and #deleteNodesLabeled:...)
+  therefore already remove a connected node's relationships even without DETACH DELETE, and
+  #deleteAll is simply an alias for #deleteAllNodes rather than a separate DETACH-DELETE query.
+  #deleteNodeAt:withRelations: exists purely for API parity with N4GraphDb; its argument has no
+  observable effect on FalkorDB today.
 - Closing/disconnecting the stick is the caller's responsibility in both cases; I never disconnect
   it myself (matches RsStream - no release/disconnect method is provided).
 - Node-CRUD methods mirror SgGraphDb (../SCypherGraph, reference-only), building Cypher with
@@ -316,7 +325,7 @@ FkGraphDb >> countRelationshipsTyped: typeOrTypes [
 	r := 'r' asCypherIdentifier.
 	rel := r rel: typeOrTypes props: #().
 	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
-	(query addReturn: r id count) beDistinct.
+	query addReturn: r count.
 	result := self runReadOnlyCypher: query.
 	^ result records first first
 ]
@@ -327,12 +336,19 @@ FkGraphDb >> deleteRelationshipsTyped: typeOrTypes [
 ]
 
 { #category : 'actions-relationships' }
-FkGraphDb >> deleteRelationshipsTyped: typeOrTypes havingAll: propertiesArray [
+FkGraphDb >> deleteRelationshipsTyped: typeOrTypes havingAll: assocArray [
+	^ self deleteRelationshipsTyped: typeOrTypes where: [ :r | r havingAll: assocArray ]
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> deleteRelationshipsTyped: typeOrTypes where: whereClauseBuilder [
 	| r rel query result |
 	r := 'r' asCypherIdentifier.
-	rel := r rel: typeOrTypes props: propertiesArray.
-	query := CyQuery match: ('' asCypherIdentifier asNode - rel - '' asCypherIdentifier asNode).
-	query addDelete: r.
+	rel := r rel: typeOrTypes props: #().
+	query := CyQuery
+		match: ('' asCypherIdentifier asNode - rel - '' asCypherIdentifier asNode)
+		where: (whereClauseBuilder value: r)
+		delete: r.
 	result := self runCypher: query.
 	^ result statistics
 ]
@@ -607,12 +623,10 @@ FkGraphDb >> countRelationships [
 
 { #category : 'global operations' }
 FkGraphDb >> deleteAll [
-	| n query result |
-	n := 'n' asCypherIdentifier.
-	query := CyQuery match: n asNode.
-	(query addDelete: n) withRelations: true.
-	result := self runCypher: query.
-	^ result statistics
+	"FalkorDB's plain DELETE already detaches a node's relationships (see the class comment's
+	Implementation Points), so deleting all nodes already deletes all relationships too."
+
+	^ self deleteAllNodes
 ]
 
 { #category : 'global operations' }
@@ -659,10 +673,23 @@ FkGraphDb >> countNodesLabeled: labelOrLabels [
 
 { #category : 'actions-nodes' }
 FkGraphDb >> deleteNodeAt: systemId [
+	^ self deleteNodeAt: systemId withRelations: false
+]
+
+{ #category : 'actions-nodes' }
+FkGraphDb >> deleteNodeAt: systemId withRelations: withRelations [
+	"withRelations has no observable effect on FalkorDB today - plain DELETE already detaches a
+	node's relationships (see the class comment's Implementation Points). Kept for API parity with
+	N4GraphDb's deleteNodeAt:withRelations:."
+
 	| n node query result |
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
-	query := CyQuery match: node where: (n getId equals: systemId) delete: node.
+	query := CyQuery
+		match: node
+		where: (n getId equals: systemId)
+		delete: node
+		in: [ :del | del withRelations: withRelations ].
 	result := self runCypher: query.
 	^ result statistics
 ]
