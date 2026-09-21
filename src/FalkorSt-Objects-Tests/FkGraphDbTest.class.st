@@ -168,7 +168,7 @@ FkGraphDbTest >> testNodesLabeledWhereOrderBySkipLimitOrdersAndPagesResults [
 	nodes := db
 		nodesLabeled: 'Person'
 		where: [ :n | (n @ 'age') greaterThan: 0 ]
-		orderBy: (('n' asCypherIdentifier @ 'age') asc)
+		orderBy: [ :n | (n @ 'age') asc ]
 		skip: 1
 		limit: 1.
 	self assert: nodes size equals: 1.
@@ -439,6 +439,117 @@ FkGraphDbTest >> testRelationshipAtMergePropertiesOnMissingRelationshipCreatesNo
 	db := self db.
 	db relationshipAt: 999999 mergeProperties: { 'weight' -> 9 } asDictionary.
 	self assert: (db relationshipAt: 999999) isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipAtRemovePropertyAtRemovesTheProperty [
+	| db alice bob created reloaded |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	created := db
+		createRelationshipTyped: 'KNOWS'
+		fromNodeId: alice id
+		toNodeId: bob id
+		properties: { 'since' -> 2020. 'weight' -> 5 }.
+	db relationshipAt: created id removePropertyAt: 'weight'.
+	reloaded := db relationshipAt: created id.
+	self assert: (reloaded propertyAt: 'weight') isNil.
+	self assert: (reloaded propertyAt: 'since') equals: 2020
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipsTypedAnswersAllRelationshipsOfTheType [
+	| db alice bob carol |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	carol := db createNodeLabeled: 'Person'.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: bob id toNodeId: carol id properties: #().
+	db createOutRelationshipTyped: 'LIKES' fromNodeId: alice id toNodeId: carol id properties: #().
+	self assert: (db relationshipsTyped: 'KNOWS') size equals: 2
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipsTypedHavingValueFiltersByASingleProperty [
+	| db alice bob carol |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	carol := db createNodeLabeled: 'Person'.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: { 'since' -> 2020 }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: bob id toNodeId: carol id properties: { 'since' -> 2021 }.
+	self assert: (db relationshipsTyped: 'KNOWS' having: 'since' value: 2020) size equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipsTypedHavingAllFiltersByProperties [
+	| db alice bob carol |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	carol := db createNodeLabeled: 'Person'.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: { 'since' -> 2020. 'weight' -> 1 }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: bob id toNodeId: carol id properties: { 'since' -> 2020. 'weight' -> 2 }.
+	self assert: (db relationshipsTyped: 'KNOWS' havingAll: { 'since' -> 2020. 'weight' -> 1 }) size equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipsTypedWhereFiltersByAnArbitraryClause [
+	| db alice bob carol rels |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	carol := db createNodeLabeled: 'Person'.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: { 'weight' -> 5 }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: bob id toNodeId: carol id properties: { 'weight' -> 15 }.
+	rels := db relationshipsTyped: 'KNOWS' where: [ :r | (r @ 'weight') greaterThan: 10 ].
+	self assert: rels size equals: 1.
+	self assert: (rels first propertyAt: 'weight') equals: 15
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipsTypedWhereOrderBySkipLimitOrdersAndPagesResults [
+	| db alice bob carol dave rels |
+	db := self db.
+	alice := db createNodeLabeled: 'Person'.
+	bob := db createNodeLabeled: 'Person'.
+	carol := db createNodeLabeled: 'Person'.
+	dave := db createNodeLabeled: 'Person'.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: { 'weight' -> 30 }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: bob id toNodeId: carol id properties: { 'weight' -> 10 }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: carol id toNodeId: dave id properties: { 'weight' -> 20 }.
+	rels := db
+		relationshipsTyped: 'KNOWS'
+		where: [ :r | (r @ 'weight') greaterThan: 0 ]
+		orderBy: [ :r | (r @ 'weight') asc ]
+		skip: 1
+		limit: 1.
+	self assert: rels size equals: 1.
+	self assert: (rels first propertyAt: 'weight') equals: 20
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testNodesLabeledHavingValueFiltersByASingleProperty [
+	| db nodes |
+	db := self db.
+	db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice'. 'age' -> 30 }.
+	db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob'. 'age' -> 25 }.
+	nodes := db nodesLabeled: 'Person' having: 'name' value: 'Alice'.
+	self assert: nodes size equals: 1.
+	self assert: (nodes first propertyAt: 'name') equals: 'Alice'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testNodeAtRemovePropertyAtRemovesTheProperty [
+	| db created reloaded |
+	db := self db.
+	created := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice'. 'age' -> 30 }.
+	db nodeAt: created id removePropertyAt: 'age'.
+	reloaded := db nodeAt: created id.
+	self assert: (reloaded propertyAt: 'age') isNil.
+	self assert: (reloaded propertyAt: 'name') equals: 'Alice'
 ]
 
 { #category : 'tests' }
