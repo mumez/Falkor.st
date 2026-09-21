@@ -38,7 +38,8 @@ Public API and Key Messages:
   optionally filtered by property equality or an arbitrary where-clause block, answering a
   collection of FkGraphNode
 - #nodesLabeled:where:orderBy:skip:limit: / #nodesLabeled:where:skip:limit: - like
-  #nodesLabeled:where: with ORDER BY/SKIP/LIMIT applied
+  #nodesLabeled:where: with ORDER BY/SKIP/LIMIT applied; orderByClauseBuilder is a block invoked
+  with the same 'n' identifier as whereClauseBuilder
 - #nodeAt:propertyAt:put: - SET a single property by id without fetching the node first,
   answering the query's statistics
 - #nodeAt:properties: / #nodeAt:mergeProperties: - SET a node's whole property map by id without
@@ -76,7 +77,8 @@ Public API and Key Messages:
   optionally filtered by a single property-equality shortcut, property equality across a whole
   assoc array, or an arbitrary where-clause block, answering a collection of FkGraphRelationship
 - #relationshipsTyped:where:orderBy:skip:limit: - like #relationshipsTyped:where: with
-  ORDER BY/SKIP/LIMIT applied
+  ORDER BY/SKIP/LIMIT applied; orderByClauseBuilder is a block invoked with the same 'r' identifier
+  as whereClauseBuilder
 - #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: -
   MATCH one-hop paths of the given relationship type(s)/direction from a start node id to end nodes
   matching labels/properties, running the query and applying the given returner block to each
@@ -146,13 +148,13 @@ Implementation Points:
   (../Neo4reSt, reference-only): MATCH an anonymous directed pattern (unnamed start/end nodes,
   named relationship 'r'), apply the where-clause block and RETURN r directly (not a whole path),
   then wrap each raw result relationship as an FkGraphRelationship via the private
-  #relationshipsFrom: helper - analogous to #nodesFrom: for nodes. Unlike N4GraphDb, orderByClause
-  is passed straight through rather than invoked as a block, matching
-  #nodesLabeled:where:orderBy:skip:limit:'s own calling convention for CyQuery class >>
-  match:where:return:orderBy:skip:limit:. Callers must pass a raw order-by clause expression (e.g.
-  built with CyExpression's #asc/#desc) - CyQuery's builder only applies orderBy when it is neither
-  nil nor a block, so passing a whereClauseBuilder-style block here is silently ignored rather than
-  raising an error.
+  #relationshipsFrom: helper - analogous to #nodesFrom: for nodes. Like
+  #nodesLabeled:where:orderBy:skip:limit:, orderByClauseBuilder is a block invoked with the same
+  'r' identifier as whereClauseBuilder, matching N4GraphDb's convention, so callers never need to
+  build their own 'r' asCypherIdentifier for ordering. CyQuery class >>
+  match:where:return:orderBy:skip:limit: itself still takes a raw order-by clause expression (e.g.
+  built with CyExpression's #asc/#desc), not a block - CyQuery's builder only applies orderBy when
+  it is neither nil nor a block, so the block is evaluated here before being passed through.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -314,7 +316,7 @@ FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder [
 ]
 
 { #category : 'actions-relationships' }
-FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: orderByClause skip: skip limit: limit [
+FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: orderByClauseBuilder skip: skip limit: limit [
 	| r rel query result |
 	r := 'r' asCypherIdentifier.
 	rel := r rel: typeOrTypes props: #().
@@ -322,7 +324,7 @@ FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: 
 		match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode)
 		where: (whereClauseBuilder value: r)
 		return: r
-		orderBy: orderByClause
+		orderBy: (orderByClauseBuilder ifNotNil: [ orderByClauseBuilder value: r ])
 		skip: skip
 		limit: limit.
 	result := self runCypher: query.
@@ -718,14 +720,14 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder [
 ]
 
 { #category : 'actions-nodes' }
-FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder orderBy: orderByClause skip: skip limit: limit [
+FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder orderBy: orderByClauseBuilder skip: skip limit: limit [
 	| node query result |
 	node := 'n' asCypherIdentifier.
 	query := CyQuery
 		match: (CyNode name: node labels: (self labelsFor: labelOrLabels))
 		where: (whereClauseBuilder value: node)
 		return: node
-		orderBy: orderByClause
+		orderBy: (orderByClauseBuilder value: node)
 		skip: skip
 		limit: limit.
 	result := self runCypher: query.

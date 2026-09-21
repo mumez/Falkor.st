@@ -168,7 +168,7 @@ FkGraphDbTest >> testNodesLabeledWhereOrderBySkipLimitOrdersAndPagesResults [
 	nodes := db
 		nodesLabeled: 'Person'
 		where: [ :n | (n @ 'age') greaterThan: 0 ]
-		orderBy: (('n' asCypherIdentifier @ 'age') asc)
+		orderBy: [ :n | (n @ 'age') asc ]
 		skip: 1
 		limit: 1.
 	self assert: nodes size equals: 1.
@@ -523,7 +523,7 @@ FkGraphDbTest >> testRelationshipsTypedWhereOrderBySkipLimitOrdersAndPagesResult
 	rels := db
 		relationshipsTyped: 'KNOWS'
 		where: [ :r | (r @ 'weight') greaterThan: 0 ]
-		orderBy: (('r' asCypherIdentifier @ 'weight') asc)
+		orderBy: [ :r | (r @ 'weight') asc ]
 		skip: 1
 		limit: 1.
 	self assert: rels size equals: 1.
