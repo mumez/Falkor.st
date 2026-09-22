@@ -9,7 +9,7 @@ Responsibility:
 - Wrap the raw FkPath's nodes and relationships as FkGraphNode/FkGraphRelationship, so callers never
   see raw FkNode/FkRelationship values off a path
 - Hold an optional traversal #direction (#in / #out / nil), passed through to each wrapped
-  FkGraphRelationship so its #headNodeId/#tailNodeId can resolve
+  FkGraphRelationship so its #ownNodeId/#otherNodeId can resolve
 
 Collaborators:
 - FkPath: the decoded path I wrap, held as my #rawPath

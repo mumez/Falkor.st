@@ -1,12 +1,12 @@
 "
-I test FkGraphRelationship's endpoint accessors (#startNode/#endNode/#headNode/#tailNode) and
+I test FkGraphRelationship's endpoint accessors (#startNode/#endNode/#ownNode/#otherNode) and
 inherited bulk property mutators against a real FalkorDB instance, including the anchor-relative
-direction convention #headNodeId/#tailNodeId depend on.
+direction convention #ownNodeId/#otherNodeId depend on.
 
 Coverage:
 - graph-object-api spec: ""Fetching a relationship's start/end node""
-- graph-object-api spec: ""Resolving head/tail node relative to the traversal anchor""
-- graph-object-api spec: ""A relationship with no known direction signals an error on head/tail""
+- graph-object-api spec: ""Resolving own/other node relative to the traversal anchor""
+- graph-object-api spec: ""A relationship with no known direction signals an error on own/other""
 - graph-object-api spec: ""Bulk property SET/MERGE/REMOVE on a relationship, inherited from
   FkGraphObject""
 "
@@ -57,50 +57,50 @@ FkGraphRelationshipTest >> testStartNodeAndEndNodeAnswerTheRelationshipsEndpoint
 ]
 
 { #category : 'tests' }
-FkGraphRelationshipTest >> testHeadAndTailResolveCorrectlyForOutRelationship [
+FkGraphRelationshipTest >> testOwnAndOtherResolveCorrectlyForOutRelationship [
 	| db people alice bob rel |
 	db := self db.
 	people := self createAliceKnowsBobIn: db.
 	alice := people first.
 	bob := people second.
 	rel := (alice outRelationshipsTyped: 'KNOWS') first.
-	self assert: rel tailNode id equals: alice id.
-	self assert: rel headNode id equals: bob id
+	self assert: rel ownNode id equals: alice id.
+	self assert: rel otherNode id equals: bob id
 ]
 
 { #category : 'tests' }
-FkGraphRelationshipTest >> testHeadAndTailResolveCorrectlyForInRelationship [
+FkGraphRelationshipTest >> testOwnAndOtherResolveCorrectlyForInRelationship [
 	| db people alice bob rel |
 	db := self db.
 	people := self createAliceKnowsBobIn: db.
 	alice := people first.
 	bob := people second.
 	rel := (bob inRelationshipsTyped: 'KNOWS') first.
-	self assert: rel tailNode id equals: bob id.
-	self assert: rel headNode id equals: alice id
+	self assert: rel ownNode id equals: bob id.
+	self assert: rel otherNode id equals: alice id
 ]
 
 { #category : 'tests' }
-FkGraphRelationshipTest >> testHeadNodeIdSignalsUnknownDirectionWhenDirectionIsNotSet [
+FkGraphRelationshipTest >> testOtherNodeIdSignalsUnknownDirectionWhenDirectionIsNotSet [
 	| db people alice rel |
 	db := self db.
 	people := self createAliceKnowsBobIn: db.
 	alice := people first.
 	rel := db relationshipAt: (db relationshipsTyped: 'KNOWS') first id.
 	self
-		should: [ rel headNodeId ]
+		should: [ rel otherNodeId ]
 		raise: FkGraphDbError
 		withExceptionDo: [ :ex | self assert: ex kind equals: #UnknownDirection ]
 ]
 
 { #category : 'tests' }
-FkGraphRelationshipTest >> testTailNodeIdSignalsUnknownDirectionWhenDirectionIsNotSet [
+FkGraphRelationshipTest >> testOwnNodeIdSignalsUnknownDirectionWhenDirectionIsNotSet [
 	| db people rel |
 	db := self db.
 	people := self createAliceKnowsBobIn: db.
 	rel := db relationshipAt: (db relationshipsTyped: 'KNOWS') first id.
 	self
-		should: [ rel tailNodeId ]
+		should: [ rel ownNodeId ]
 		raise: FkGraphDbError
 		withExceptionDo: [ :ex | self assert: ex kind equals: #UnknownDirection ]
 ]

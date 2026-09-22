@@ -9,14 +9,14 @@ Responsibility:
 - Supply the CyRelationship pattern element (#matchElementNamed:) that FkGraphObject's #delete /
   #propertyAt:put: / #reload use to match myself by id
 - Fetch my start/end/head/tail node as an FkGraphNode via my FkGraphDb's #nodeAt:
-- Hold an optional traversal #direction (#in / #out / nil) used to resolve #headNodeId/#tailNodeId
+- Hold an optional traversal #direction (#in / #out / nil) used to resolve #ownNodeId/#otherNodeId
   relative to the anchor node a path or one-hop query was fetched from
 
 Collaborators:
 - FkRelationship: the decoded relationship I wrap, held as my inherited #rawGraphObject
 - FkGraphObject: my superclass, running the Cypher (built with SCypher's CyQuery/CyRelationship) my
   mutating operations need
-- FkGraphDbError: signaled by #headNodeId/#tailNodeId when #direction is unknown (nil)
+- FkGraphDbError: signaled by #ownNodeId/#otherNodeId when #direction is unknown (nil)
 
 Public API and Key Messages:
 - FkGraphRelationship class >> on:in: - wraps an FkRelationship with the FkGraphDb it was fetched
@@ -32,10 +32,10 @@ Public API and Key Messages:
 - #startNode / #endNode - the relationship's raw start/end node, fetched and wrapped as an
   FkGraphNode
 - #direction - #in/#out/nil, the traversal anchor I was fetched relative to
-- #headNodeId / #tailNodeId - the far/anchor node id relative to #direction (#out: tail=start,
-  head=end; #in: tail=end, head=start); signal FkGraphDbError (#UnknownDirection) when #direction
-  is nil, since head/tail have no defined meaning without an anchor
-- #headNode / #tailNode - #headNodeId/#tailNodeId fetched and wrapped as an FkGraphNode
+- #ownNodeId / #otherNodeId - the anchor/far node id relative to #direction (#out: own=start,
+  other=end; #in: own=end, other=start); signal FkGraphDbError (#UnknownDirection) when #direction
+  is nil, since own/other have no defined meaning without an anchor
+- #ownNode / #otherNode - #ownNodeId/#otherNodeId fetched and wrapped as an FkGraphNode
 
 Implementation Points:
 - #direction is nil unless explicitly supplied via #on:in:direction: - FkGraphDb's #relationshipAt:
@@ -82,16 +82,16 @@ FkGraphRelationship >> endNodeId [
 ]
 
 { #category : 'accessing' }
-FkGraphRelationship >> headNode [
-	^ self db nodeAt: self headNodeId
+FkGraphRelationship >> otherNode [
+	^ self db nodeAt: self otherNodeId
 ]
 
 { #category : 'accessing' }
-FkGraphRelationship >> headNodeId [
+FkGraphRelationship >> otherNodeId [
 	self direction == #in ifTrue: [ ^ self startNodeId ].
 	self direction == #out ifTrue: [ ^ self endNodeId ].
 	^ FkGraphDbError unknownDirection
-		signal: 'Cannot determine head node: relationship direction is unknown'
+		signal: 'Cannot determine other node: relationship direction is unknown'
 ]
 
 { #category : 'private' }
@@ -118,16 +118,16 @@ FkGraphRelationship >> startNodeId [
 ]
 
 { #category : 'accessing' }
-FkGraphRelationship >> tailNode [
-	^ self db nodeAt: self tailNodeId
+FkGraphRelationship >> ownNode [
+	^ self db nodeAt: self ownNodeId
 ]
 
 { #category : 'accessing' }
-FkGraphRelationship >> tailNodeId [
+FkGraphRelationship >> ownNodeId [
 	self direction == #in ifTrue: [ ^ self endNodeId ].
 	self direction == #out ifTrue: [ ^ self startNodeId ].
 	^ FkGraphDbError unknownDirection
-		signal: 'Cannot determine tail node: relationship direction is unknown'
+		signal: 'Cannot determine own node: relationship direction is unknown'
 ]
 
 { #category : 'accessing' }
