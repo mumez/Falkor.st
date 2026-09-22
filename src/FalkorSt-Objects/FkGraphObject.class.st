@@ -23,11 +23,19 @@ Public API and Key Messages:
 - FkGraphObject class >> on:in: - wraps a raw graph value with the FkGraphDb it was fetched through
 - #id / #properties / #propertyAt: - delegate to the wrapped raw value
 - #propertyAt:put: - SETs the property in FalkorDB, then reloads the wrapped raw value
+- #properties: / #mergeProperties: - SET my whole property map (replacing / merging), bound as a
+  single #runCypher:arguments: parameter via my FkGraphDb's #valuesArgumentsFor:, then reload
+- #removePropertyAt: - REMOVEs a single property in FalkorDB, then reload
 - #delete - DELETEs myself in FalkorDB
 
 Implementation Points:
 - #matchElementNamed: is subclassResponsibility - it answers the CyNode/CyRelationship built with
   the given identifier that #delete/#propertyAt:put:/#reload match myself by id through.
+- #properties:/#mergeProperties:/#removePropertyAt: share their match/where/run/reload skeleton
+  through the private #changeProperties:using: helper - mirrors FkGraphNode's #changeLabels:using:.
+  The block passed in appends the SET/REMOVE statement to the query itself (query addSet:/addRemove:),
+  since unlike labels the SET expression differs per case (#to: vs #addAll:) rather than sharing one
+  expression. #removePropertyAt: passes nil for props since REMOVE binds no parameter.
 "
 Class {
 	#name : 'FkGraphObject',
@@ -100,6 +108,29 @@ FkGraphObject >> propertyAt: key put: value [
 	self reload
 ]
 
+{ #category : 'private' }
+FkGraphObject >> changeProperties: propsOrNil using: aBlock [
+	| n element query |
+	n := 'n' asCypherIdentifier.
+	element := self matchElementNamed: n.
+	query := CyQuery match: element where: (n getId equals: self id).
+	aBlock value: query value: n.
+	propsOrNil
+		ifNil: [ self db runCypher: query ]
+		ifNotNil: [ self db runCypher: query arguments: (self db valuesArgumentsFor: propsOrNil) ].
+	self reload
+]
+
+{ #category : 'actions' }
+FkGraphObject >> mergeProperties: props [
+	^ self changeProperties: props using: [ :query :n | query addSet: (n addAll: 'values' asCypherParameter) ]
+]
+
+{ #category : 'actions' }
+FkGraphObject >> properties: props [
+	^ self changeProperties: props using: [ :query :n | query addSet: (n to: 'values' asCypherParameter) ]
+]
+
 { #category : 'accessing' }
 FkGraphObject >> rawGraphObject [
 	^ rawGraphObject
@@ -108,6 +139,11 @@ FkGraphObject >> rawGraphObject [
 { #category : 'private' }
 FkGraphObject >> rawGraphObject: anObject [
 	rawGraphObject := anObject
+]
+
+{ #category : 'actions' }
+FkGraphObject >> removePropertyAt: key [
+	^ self changeProperties: nil using: [ :query :n | query addRemove: (n @ key) ]
 ]
 
 { #category : 'private' }

@@ -492,7 +492,7 @@ FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeI
 		whereIn: whereClauseBuilder
 		pathProcessIn: nil
 		returnIn: returnBlock.
-	returnBlock ifNil: [ ^ result records collect: [ :record | returner value: (FkGraphPath on: record first in: self) ] ].
+	returnBlock ifNil: [ ^ result records collect: [ :record | returner value: (FkGraphPath on: record first in: self direction: direction) ] ].
 	^ result records collect: [ :record | returner value: record first ]
 ]
 

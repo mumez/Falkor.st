@@ -39,6 +39,9 @@ Public API and Key Messages:
   the whole graph, an unrelated concept) and from #labels (unrelated to caching) so the name itself
   signals the DB-vs-cache distinction; answers an empty collection (not nil) for a labelless node
 - #delete - DELETEs the node in FalkorDB
+- #deleteWithRelations - DELETEs the node and its relationships, via my FkGraphDb's
+  #deleteNodeAt:withRelations: (kept for API parity with N4GraphDb; withRelations has no observable
+  effect on FalkorDB today - see FkGraphDb's class comment)
 - #rawNode - the wrapped FkNode (an alias for the inherited #rawGraphObject)
 - #relationships / #relationshipsTyped: / #relationshipsTyped:having:value: /
   #relationshipsTyped:endNodeHaving:value: / #relationshipsTyped:havingAll:endNodeWithLabels:havingAll: /
@@ -255,6 +258,11 @@ FkGraphNode >> inRelationshipsTyped: typeOrTypes where: whereClauseBuilder [
 		endNodeWithLabels: {}
 		havingAll: {}
 		whereIn: whereClauseBuilder
+]
+
+{ #category : 'actions' }
+FkGraphNode >> deleteWithRelations [
+	^ self db deleteNodeAt: self id withRelations: true
 ]
 
 { #category : 'accessing' }
