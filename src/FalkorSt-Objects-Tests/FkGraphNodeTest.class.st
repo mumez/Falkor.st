@@ -366,3 +366,57 @@ FkGraphNodeTest >> testLabelsFromDbAnswersEmptyCollectionWhenNoLabelsExist [
 	self assert: person labelsFromDb isNotNil.
 	self assert: person labelsFromDb isEmpty
 ]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testEqualityAnswersTrueForTwoWrappersAroundTheSameNode [
+	| db created firstWrapper secondWrapper |
+	db := self db.
+	created := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	firstWrapper := db nodeAt: created id.
+	secondWrapper := db nodeAt: created id.
+	self assert: firstWrapper = secondWrapper.
+	self assert: firstWrapper hash equals: secondWrapper hash
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testEqualityAnswersFalseForWrappersAroundDifferentNodes [
+	| db alice bob |
+	db := self db.
+	alice := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
+	self deny: alice = bob
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testAtAndPropertyAtAnswerTheSameValue [
+	| graphNode |
+	graphNode := self createGraphNode.
+	self assert: (graphNode @ 'name') equals: (graphNode propertyAt: 'name').
+	self assert: (graphNode at: 'name') equals: (graphNode propertyAt: 'name')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testAtPutBehavesLikePropertyAtPut [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode at: 'age' put: 31.
+	self assert: (graphNode propertyAt: 'age') equals: 31.
+	self assert: ((self endpoint graphQuery: self graphName cypher: 'MATCH (p) RETURN p.age')
+		records first first) equals: 31
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testNameAnswersTheNamePropertyValue [
+	| graphNode |
+	graphNode := self createGraphNode.
+	self assert: graphNode name equals: (graphNode propertyAt: 'name')
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testNameColonUpdatesTheNamePropertyValue [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode name: 'NewName'.
+	self assert: graphNode name equals: 'NewName'.
+	self assert: (graphNode propertyAt: 'name') equals: 'NewName'
+]

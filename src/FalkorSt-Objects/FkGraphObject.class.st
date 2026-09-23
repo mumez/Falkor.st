@@ -27,6 +27,10 @@ Public API and Key Messages:
   single #runCypher:arguments: parameter via my FkGraphDb's #valuesArgumentsFor:, then reload
 - #removePropertyAt: - REMOVEs a single property in FalkorDB, then reload
 - #delete - DELETEs myself in FalkorDB
+- #= / #hash - equal when same class and same #id, so wrappers refetched from the same underlying
+  object compare and hash equal
+- #@ / #at: / #at:put: - shortcut aliases for #propertyAt: / #propertyAt:put:
+- #name / #name: - shortcut accessors for the 'name' property
 
 Implementation Points:
 - #matchElementNamed: is subclassResponsibility - it answers the CyNode/CyRelationship built with
@@ -75,9 +79,44 @@ FkGraphObject >> delete [
 	self db runCypher: query
 ]
 
+{ #category : 'comparing' }
+FkGraphObject >> = other [
+	^ self class = other class and: [ self id = other id ]
+]
+
+{ #category : 'accessing' }
+FkGraphObject >> @ propName [
+	^ self propertyAt: propName
+]
+
+{ #category : 'accessing' }
+FkGraphObject >> at: propName [
+	^ self propertyAt: propName
+]
+
+{ #category : 'accessing' }
+FkGraphObject >> at: propName put: value [
+	^ self propertyAt: propName put: value
+]
+
+{ #category : 'comparing' }
+FkGraphObject >> hash [
+	^ self id hash
+]
+
 { #category : 'accessing' }
 FkGraphObject >> id [
 	^ self rawGraphObject id
+]
+
+{ #category : 'accessing' }
+FkGraphObject >> name [
+	^ self propertyAt: 'name'
+]
+
+{ #category : 'accessing' }
+FkGraphObject >> name: aString [
+	^ self propertyAt: 'name' put: aString
 ]
 
 { #category : 'private' }
