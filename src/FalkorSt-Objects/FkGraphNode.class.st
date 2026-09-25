@@ -41,7 +41,8 @@ Public API and Key Messages:
 - #delete - DELETEs the node in FalkorDB
 - #deleteWithRelations - DELETEs the node and its relationships, via my FkGraphDb's
   #deleteNodeAt:withRelations: (kept for API parity with N4GraphDb; withRelations has no observable
-  effect on FalkorDB today - see FkGraphDb's class comment)
+  effect on FalkorDB today - see FkGraphDb's class comment); marks me #isDeleted like the inherited
+  #delete, since it bypasses that method's Cypher and would otherwise leave #isDeleted stale
 - #rawNode - the wrapped FkNode (an alias for the inherited #rawGraphObject)
 - #relationships / #relationshipsTyped: / #relationshipsTyped:having:value: /
   #relationshipsTyped:endNodeHaving:value: / #relationshipsTyped:havingAll:endNodeWithLabels:havingAll: /
@@ -262,7 +263,10 @@ FkGraphNode >> inRelationshipsTyped: typeOrTypes where: whereClauseBuilder [
 
 { #category : 'actions' }
 FkGraphNode >> deleteWithRelations [
-	^ self db deleteNodeAt: self id withRelations: true
+	| result |
+	result := self db deleteNodeAt: self id withRelations: true.
+	isDeleted := true.
+	^ result
 ]
 
 { #category : 'accessing' }

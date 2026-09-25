@@ -13,6 +13,9 @@ Responsibility:
   (#matchElementNamed:) - everything else about the match/set/delete/return Cypher is generic
 - Signal an FkGraphDbError (#NoSuchObject) instead of failing with SubscriptOutOfBounds when
   #reload's MATCH-by-id finds no record (e.g. the object was deleted by another session)
+- Track whether #delete has been sent to me locally (#isDeleted) and signal an FkGraphDbError
+  (#AlreadyDeleted) from my property getters/setters once I have been deleted - #delete itself
+  stays idempotent (a second #delete is a no-op, not an error)
 
 Collaborators:
 - FkGraphDb: runs the Cypher (built with SCypher's CyQuery plus my subclass's pattern element) my
@@ -29,6 +32,7 @@ Public API and Key Messages:
 - #delete - DELETEs myself in FalkorDB
 - #= / #hash - equal when same class and same #id, so wrappers refetched from the same underlying
   object compare and hash equal
+- #isDeleted - answers whether I have been #delete-d locally
 - #@ / #at: / #at:put: - shortcut aliases for #propertyAt: / #propertyAt:put:
 - #name / #name: - shortcut accessors for the 'name' property
 
@@ -46,7 +50,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'rawGraphObject',
-		'db'
+		'db',
+		'isDeleted'
 	],
 	#category : 'FalkorSt-Objects',
 	#package : 'FalkorSt-Objects'
@@ -58,6 +63,12 @@ FkGraphObject class >> on: aRawGraphObject in: aFkGraphDb [
 		rawGraphObject: aRawGraphObject;
 		db: aFkGraphDb;
 		yourself
+]
+
+{ #category : 'initialization' }
+FkGraphObject >> initialize [
+	super initialize.
+	isDeleted := false
 ]
 
 { #category : 'accessing' }
@@ -76,7 +87,8 @@ FkGraphObject >> delete [
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) delete: element.
-	self db runCypher: query
+	self db runCypher: query.
+	isDeleted := true
 ]
 
 { #category : 'comparing' }
@@ -109,6 +121,11 @@ FkGraphObject >> id [
 	^ self rawGraphObject id
 ]
 
+{ #category : 'testing' }
+FkGraphObject >> isDeleted [
+	^ isDeleted
+]
+
 { #category : 'accessing' }
 FkGraphObject >> name [
 	^ self propertyAt: 'name'
@@ -126,17 +143,27 @@ FkGraphObject >> matchElementNamed: anIdentifier [
 
 { #category : 'accessing' }
 FkGraphObject >> properties [
+	self checkIsDeleted.
 	^ self rawGraphObject properties
 ]
 
 { #category : 'accessing' }
 FkGraphObject >> propertyAt: key [
+	self checkIsDeleted.
 	^ self rawGraphObject properties at: key ifAbsent: [ nil ]
+]
+
+{ #category : 'private' }
+FkGraphObject >> checkIsDeleted [
+	isDeleted ifTrue: [
+		^ FkGraphDbError alreadyDeleted
+			signal: ('Graph object {1} has already been deleted' format: {self id}) ]
 ]
 
 { #category : 'actions' }
 FkGraphObject >> propertyAt: key put: value [
 	| n element query |
+	self checkIsDeleted.
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery
@@ -150,6 +177,7 @@ FkGraphObject >> propertyAt: key put: value [
 { #category : 'private' }
 FkGraphObject >> changeProperties: propsOrNil using: aBlock [
 	| n element query |
+	self checkIsDeleted.
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id).
