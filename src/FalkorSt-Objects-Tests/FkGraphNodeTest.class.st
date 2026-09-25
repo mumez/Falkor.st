@@ -277,6 +277,21 @@ FkGraphNodeTest >> testPropertyMutationAfterDeleteSignalsAnAlreadyDeletedError [
 ]
 
 { #category : 'tests' }
+FkGraphNodeTest >> testLabelMutationAfterDeleteSignalsAnAlreadyDeletedError [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode delete.
+	self
+		should: [ graphNode addLabel: 'Employee' ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #AlreadyDeleted ].
+	self
+		should: [ graphNode removeLabel: 'Person' ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #AlreadyDeleted ]
+]
+
+{ #category : 'tests' }
 FkGraphNodeTest >> testDeleteIsIdempotent [
 	| graphNode |
 	graphNode := self createGraphNode.

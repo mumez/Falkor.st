@@ -110,6 +110,7 @@ FkGraphNode >> addLabels: labels [
 { #category : 'private' }
 FkGraphNode >> changeLabels: labels using: addStatementBlock [
 	| n element query |
+	self checkIsDeleted.
 	n := 'n' asCypherIdentifier.
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id).

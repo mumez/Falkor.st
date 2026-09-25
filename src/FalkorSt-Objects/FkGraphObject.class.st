@@ -14,7 +14,8 @@ Responsibility:
 - Signal an FkGraphDbError (#NoSuchObject) instead of failing with SubscriptOutOfBounds when
   #reload's MATCH-by-id finds no record (e.g. the object was deleted by another session)
 - Track whether #delete has been sent to me locally (#isDeleted) and signal an FkGraphDbError
-  (#AlreadyDeleted) from my property getters/setters once I have been deleted - #delete itself
+  (#AlreadyDeleted) from my property getters/setters (and FkGraphNode's label mutators) once I
+  have been deleted - #delete itself
   stays idempotent (a second #delete is a no-op, not an error)
 
 Collaborators:
