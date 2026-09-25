@@ -14,6 +14,11 @@ Public API and Key Messages:
   query answers no records for a graph object expected to still exist
 - FkGraphDbError class >> invalidQuery - an #InvalidQuery-kind error, signaled when a CyQuery built
   by the high-level API is not shaped as expected (e.g. a missing trailing CyReturn)
+- FkGraphDbError class >> unknownDirection - an #UnknownDirection-kind error, signaled by
+  FkGraphRelationship's #ownNodeId/#otherNodeId when the relationship has no known traversal anchor
+  (direction) to resolve own/other against
+- FkGraphDbError class >> alreadyDeleted - an #AlreadyDeleted-kind error, signaled by
+  FkGraphObject's property getters once the object has been #delete-d
 - #kind / #kind: - the symbolic error category
 "
 Class {
@@ -41,6 +46,16 @@ FkGraphDbError class >> noSuchObject [
 { #category : 'instance creation' }
 FkGraphDbError class >> invalidQuery [
 	^ self kind: #InvalidQuery
+]
+
+{ #category : 'instance creation' }
+FkGraphDbError class >> unknownDirection [
+	^ self kind: #UnknownDirection
+]
+
+{ #category : 'instance creation' }
+FkGraphDbError class >> alreadyDeleted [
+	^ self kind: #AlreadyDeleted
 ]
 
 { #category : 'accessing' }

@@ -22,7 +22,7 @@ BaselineOfFalkorSt >> baseline: spec [
 			package: 'FalkorSt-Objects-Tests' with: [ spec requires: #('FalkorSt-Core-Tests' 'FalkorSt-Objects') ].
 
 		spec
-			group: 'default' with: #('Core');
+			group: 'default' with: #('Core' 'Objects' 'Tests');
 			group: 'Core' with: #('FalkorSt-Core');
 			group: 'Tests' with: #('FalkorSt-Core-Tests' 'FalkorSt-Objects' 'FalkorSt-Objects-Tests');
 			group: 'Objects' with: #('FalkorSt-Objects');

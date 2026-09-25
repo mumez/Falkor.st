@@ -6,6 +6,8 @@ settings the first time a connection is needed.
 
 Responsibility:
 - Hold a graph name together with the FkFalkorStick connection it is reached through
+- Lazily fall back to a default graph name (#defaultName) when none was supplied (e.g. nil passed
+  to #named:/#on:named:, or plain #new), mirroring how #stick lazily creates itself
 - Lazily create and connect an FkFalkorStick from FkSettings when none is supplied
 - Answer the FkGraphEndpoint (#endpoint) that runs GRAPH.* commands for this graph
 - Provide thin #runCypher:/#runReadOnlyCypher: wrappers so callers don't have to route
@@ -18,9 +20,10 @@ Collaborators:
 
 Public API and Key Messages:
 - FkGraphDb class >> named: - lazily creates and connects a stick from FkSettings default targetUrl
-- FkGraphDb class >> on:named: - uses an already-connected stick; graph name is required either way
+- FkGraphDb class >> on:named: - uses an already-connected stick; nil graph name defaults to
+  #defaultName ('default')
 - #endpoint - self stick endpoint
-- #name - the graph name
+- #name - the graph name, lazily defaulting to #defaultName ('default') when nil
 - #runCypher: cypherQueryOrString - runs a raw Cypher string or a CyQuery (rendered via
   #cypherStringFor: first) as a write query
 - #runCypher:arguments: - like #runCypher: but binds a Dictionary of named parameters via
@@ -38,17 +41,23 @@ Public API and Key Messages:
   optionally filtered by property equality or an arbitrary where-clause block, answering a
   collection of FkGraphNode
 - #nodesLabeled:where:orderBy:skip:limit: / #nodesLabeled:where:skip:limit: - like
-  #nodesLabeled:where: with ORDER BY/SKIP/LIMIT applied
+  #nodesLabeled:where: with ORDER BY/SKIP/LIMIT applied; orderByClauseBuilder is a block invoked
+  with the same 'n' identifier as whereClauseBuilder
 - #nodeAt:propertyAt:put: - SET a single property by id without fetching the node first,
   answering the query's statistics
 - #nodeAt:properties: / #nodeAt:mergeProperties: - SET a node's whole property map by id without
   fetching it first, bound as a single #runCypher:arguments: parameter (not inlined into the
   Cypher string), answering the query's statistics
 - #deleteNodeAt: / #deleteNode: - MATCH a node by id (or by an FkGraphNode's id) and DELETE it,
-  answering the query's statistics
+  answering the query's statistics; #deleteNodeAt:withRelations: is the same but also detaches the
+  node's relationships first when the argument is true (#deleteNodeAt: is an alias with false)
 - #deleteNodesLabeled:havingAll: / #deleteNodesLabeled:where: - bulk-delete nodes matching a
   label plus a property-equality filter or an arbitrary where-clause block, answering the query's
   statistics
+- #nodesLabeled:having:value: - shortcut for #nodesLabeled:where: with a single property-equality
+  filter
+- #nodeAt:removePropertyAt: - REMOVE a single property by id without fetching the node first,
+  answering the query's statistics
 - #createRelationshipTyped:fromNodeId:toNodeId:properties: / #createInRelationshipTyped:.../
   #createOutRelationshipTyped:... - CREATE a relationship between two existing nodes by id
   (fromNodeId -> toNodeId / toNodeId -> fromNodeId / fromNodeId -> toNodeId respectively -
@@ -63,17 +72,60 @@ Public API and Key Messages:
 - #relationshipAt:properties: / #relationshipAt:mergeProperties: - SET a relationship's whole
   property map by id without fetching it first, bound as a single #runCypher:arguments: parameter,
   answering the query's statistics
+- #relationshipAt:removePropertyAt: - REMOVE a single property by id without fetching the
+  relationship first, answering the query's statistics
 - #deleteRelationshipAt: - MATCH a relationship by id and DELETE it, answering the query's
   statistics
+- #relationshipsTyped: / #relationshipsTyped:having:value: / #relationshipsTyped:havingAll: /
+  #relationshipsTyped:where: - MATCH relationships of the given type(s) anywhere in the graph,
+  optionally filtered by a single property-equality shortcut, property equality across a whole
+  assoc array, or an arbitrary where-clause block, answering a collection of FkGraphRelationship
+- #relationshipsTyped:where:orderBy:skip:limit: - like #relationshipsTyped:where: with
+  ORDER BY/SKIP/LIMIT applied; orderByClauseBuilder is a block invoked with the same 'r' identifier
+  as whereClauseBuilder
 - #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returning: -
   MATCH one-hop paths of the given relationship type(s)/direction from a start node id to end nodes
   matching labels/properties, running the query and applying the given returner block to each
-  FkGraphPath-wrapped result, answering the collection of returner results
+  FkGraphPath-wrapped result, answering the collection of returner results; a thin wrapper over
+  #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returnIn:returning:
+  with returnIn: nil
+- #oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returnIn:returning: -
+  like the above, but also takes a returnIn: block that controls the shape of the underlying
+  Cypher RETURN clause (default nil returns the whole path, aliased 'p'); the block is handed the
+  query's CyReturn and may replace its #items to narrow the RETURN to the 's'/'e' (start/end node)
+  or 'r' (relationship) Cypher variables instead. When returnIn: is nil the returner block receives
+  an FkGraphPath as usual; when returnIn: narrows the RETURN, the record's first value is whatever
+  Cypher actually returns, unwrapped, and the returner block is responsible for wrapping it into
+  the matching Fk* type itself
+- #existsOneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn: - like
+  #oneHopPathsTyped:..., but answers a Boolean for whether at least one matching one-hop path
+  exists, without building any FkGraphPath wrapper
+- #existsOneHopPathsTyped:direction:from:whereIn: - convenience overload of the above with empty
+  relationship-property/end-node-label/end-node-property filters
 - #cypherStringFor: aCypherQueryOrString - answers a raw Cypher string unchanged, or renders a
   CyQuery with a FalkorDB-safe delimiter; called internally by #runCypher:/#runReadOnlyCypher: so
   callers can pass either a string or a CyQuery straight through
+- #allLabels / #allRelationshipTypes - distinct list of every label / relationship type used
+  anywhere in the graph, as an Array/OrderedCollection of Strings
+- #countNodes / #countNodesLabeled: / #countRelationships / #countRelationshipsTyped: - total
+  count of nodes/relationships, optionally filtered by label(s)/type(s)
+- #deleteAll / #deleteAllNodes / #deleteAllRelationships - bulk-delete everything in the graph,
+  only its nodes (detaching their relationships), or only its relationships, answering the query's
+  statistics; #deleteAll is an alias for #deleteAllNodes since FalkorDB's plain DELETE already
+  detaches a node's relationships (see Implementation Points)
+- #deleteRelationshipsTyped: / #deleteRelationshipsTyped:havingAll: / #deleteRelationshipsTyped:where: -
+  bulk-delete relationships of the given type(s) anywhere in the graph, optionally filtered by
+  property equality across a whole assoc array or an arbitrary where-clause block, answering the
+  query's statistics
+- #orphanedNodes - MATCH nodes with no relationships at all, answering a collection of FkGraphNode
 
 Implementation Points:
+- Unlike Neo4j, FalkorDB's plain DELETE on a node auto-detaches its relationships instead of
+  raising - verified empirically against a real instance. #deleteNodeAt: (and #deleteNodesLabeled:...)
+  therefore already remove a connected node's relationships even without DETACH DELETE, and
+  #deleteAll is simply an alias for #deleteAllNodes rather than a separate DETACH-DELETE query.
+  #deleteNodeAt:withRelations: exists purely for API parity with N4GraphDb; its argument has no
+  observable effect on FalkorDB today.
 - Closing/disconnecting the stick is the caller's responsibility in both cases; I never disconnect
   it myself (matches RsStream - no release/disconnect method is provided).
 - Node-CRUD methods mirror SgGraphDb (../SCypherGraph, reference-only), building Cypher with
@@ -103,6 +155,33 @@ Implementation Points:
   wraps explicitly by class first (see the relationship-CRUD methods above), so the returner can
   pull startNode/endNode/relationships already as FkGraphNode/FkGraphRelationship without any
   further wrapping step.
+- #existsOneHopPathsTyped:... and the returnIn:-taking #oneHopPathsTyped:...returnIn:returning:
+  mirror N4GraphDb (../Neo4reSt, reference-only): both delegate their query-building to the
+  private #oneHopPathsQueryResultFor:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:
+  pathProcessIn:returnIn:, which wraps SCypher's CyQuery class >>
+  matchPathWithRelationshipsOfTypes:havingAll:fromNodeAt:endNodeIn:pathIn:whereIn:pathProcessIn:
+  returnIn: and runs it - the direction-block selection and query construction live in that one
+  place so both callers stay in sync. #existsOneHopPathsTyped:... passes
+  pathProcessIn: [:path | path count > 0] and returnIn: [:r | r] so FalkorDB answers a bare
+  Boolean as the first (and only) record value. #oneHopPathsTyped:...returnIn:returning: passes
+  pathProcessIn: nil and exposes returnIn: to the caller instead, relying on the query builder's
+  fixed 's'/'r'/'e'/'p' Cypher variable-naming convention (start node/relationship/end node/whole
+  path) for the caller's returnIn: block to target.
+- #relationshipsTyped:where:orderBy:skip:limit: mirrors N4GraphDb's method of the same name
+  (../Neo4reSt, reference-only): MATCH an anonymous directed pattern (unnamed start/end nodes,
+  named relationship 'r'), apply the where-clause block and RETURN r directly (not a whole path),
+  then wrap each raw result relationship as an FkGraphRelationship via the private
+  #relationshipsFrom: helper - analogous to #nodesFrom: for nodes. Like
+  #nodesLabeled:where:orderBy:skip:limit:, orderByClauseBuilder is a block invoked with the same
+  'r' identifier as whereClauseBuilder, matching N4GraphDb's convention, so callers never need to
+  build their own 'r' asCypherIdentifier for ordering. CyQuery class >>
+  match:where:return:orderBy:skip:limit: itself still takes a raw order-by clause expression (e.g.
+  built with CyExpression's #asc/#desc), not a block - CyQuery's builder only applies orderBy when
+  it is neither nil nor a block, so the block is evaluated here before being passed through.
+- #orphanedNodes builds its WHERE clause with CyExpression's #not rather than #exists not: FalkorDB's
+  Cypher parser rejects exists() wrapped around an anonymous pattern expression ('Unable to resolve
+  filtered alias'), even though NOT applied directly to the bare pattern is accepted - unlike
+  Neo4j/SCypherGraph, which use #exists not for this same pattern-existence check.
 "
 Class {
 	#name : 'FkGraphDb',
@@ -244,6 +323,88 @@ FkGraphDb >> deleteRelationshipAt: systemId [
 ]
 
 { #category : 'actions-relationships' }
+FkGraphDb >> countRelationshipsTyped: typeOrTypes [
+	| r rel query result |
+	r := 'r' asCypherIdentifier.
+	rel := r rel: typeOrTypes props: #().
+	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
+	query addReturn: r count.
+	result := self runReadOnlyCypher: query.
+	^ result records first first
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> deleteRelationshipsTyped: typeOrTypes [
+	^ self deleteRelationshipsTyped: typeOrTypes havingAll: #()
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> deleteRelationshipsTyped: typeOrTypes havingAll: assocArray [
+	^ self deleteRelationshipsTyped: typeOrTypes where: [ :r | r havingAll: assocArray ]
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> deleteRelationshipsTyped: typeOrTypes where: whereClauseBuilder [
+	| r rel query result |
+	r := 'r' asCypherIdentifier.
+	rel := r rel: typeOrTypes props: #().
+	query := CyQuery
+		match: ('' asCypherIdentifier asNode - rel - '' asCypherIdentifier asNode)
+		where: (whereClauseBuilder value: r)
+		delete: r.
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes [
+	^ self relationshipsTyped: typeOrTypes havingAll: #()
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes having: key value: value [
+	^ self relationshipsTyped: typeOrTypes where: [ :r | (r @ key) equals: value ]
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes havingAll: assocArray [
+	^ self relationshipsTyped: typeOrTypes where: [ :r | r havingAll: assocArray ]
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder [
+	^ self relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: nil skip: nil limit: nil
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: orderByClauseBuilder skip: skip limit: limit [
+	| r rel query result |
+	r := 'r' asCypherIdentifier.
+	rel := r rel: typeOrTypes props: #().
+	query := CyQuery
+		match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode)
+		where: (whereClauseBuilder value: r)
+		return: r
+		orderBy: (orderByClauseBuilder ifNotNil: [ orderByClauseBuilder value: r ])
+		skip: skip
+		limit: limit.
+	result := self runCypher: query.
+	^ self relationshipsFrom: result
+]
+
+{ #category : 'actions-relationships' }
+FkGraphDb >> relationshipAt: systemId removePropertyAt: key [
+	| s e r rel query result |
+	s := 's' asCypherIdentifier.
+	e := 'e' asCypherIdentifier.
+	r := 'r' asCypherIdentifier.
+	rel := CyRelationship start: s end: e name: r.
+	query := CyQuery match: rel where: (r getId equals: systemId) remove: (r @ key).
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'actions-relationships' }
 FkGraphDb >> relationshipAt: systemId [
 	| s e r rel query result |
 	s := 's' asCypherIdentifier.
@@ -300,7 +461,47 @@ FkGraphDb >> relationshipAt: systemId propertyAt: key put: value [
 
 { #category : 'actions-paths' }
 FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder returning: returner [
-	| pathBlock query result |
+	^ self
+		oneHopPathsTyped: typeOrTypes
+		direction: direction
+		from: startNodeId
+		havingAll: relProps
+		endNodeWithLabels: labels
+		havingAll: endNodeProps
+		whereIn: whereClauseBuilder
+		returnIn: nil
+		returning: returner
+]
+
+{ #category : 'actions-paths' }
+FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder returnIn: returnBlock returning: returner [
+	"returnBlock controls the shape of the underlying Cypher RETURN clause: it is handed the
+	query's CyReturn (default items: the whole path, aliased 'p') and may replace #items to
+	narrow the RETURN to the start/end node ('s'/'e') or relationship ('r') Cypher variables
+	instead - see the class comment for the full s/r/e/p variable-naming convention. The
+	returner block must be written to match whatever returnBlock actually returns: nil (the
+	default) returns the whole path, so returner receives an FkGraphPath as usual; a narrowed
+	returnBlock changes what the record's first value actually is, and returner must wrap that
+	value into the appropriate Fk* type itself."
+
+	| result |
+	result := self
+		oneHopPathsQueryResultFor: typeOrTypes
+		direction: direction
+		from: startNodeId
+		havingAll: relProps
+		endNodeWithLabels: labels
+		havingAll: endNodeProps
+		whereIn: whereClauseBuilder
+		pathProcessIn: nil
+		returnIn: returnBlock.
+	returnBlock ifNil: [ ^ result records collect: [ :record | returner value: (FkGraphPath on: record first in: self direction: direction) ] ].
+	^ result records collect: [ :record | returner value: record first ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> oneHopPathsQueryResultFor: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder pathProcessIn: processBlock returnIn: returnBlock [
+	| pathBlock query |
 	pathBlock := [ :startNode :rel :endNode | startNode - rel - endNode ].
 	direction == #in ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode <- rel - endNode ] ].
 	direction == #out ifTrue: [ pathBlock := [ :startNode :rel :endNode | startNode - rel -> endNode ] ].
@@ -310,10 +511,39 @@ FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeI
 		fromNodeAt: startNodeId
 		endNodeIn: [ :e | e node: labels props: endNodeProps ]
 		pathIn: pathBlock
-		whereIn: whereClauseBuilder.
-	result := self runCypher: query.
-	^ result records collect: [ :record |
-		returner value: (FkGraphPath on: record first in: self) ]
+		whereIn: whereClauseBuilder
+		pathProcessIn: processBlock
+		returnIn: returnBlock.
+	^ self runCypher: query
+]
+
+{ #category : 'actions-paths' }
+FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder [
+	| result |
+	result := self
+		oneHopPathsQueryResultFor: typeOrTypes
+		direction: direction
+		from: startNodeId
+		havingAll: relProps
+		endNodeWithLabels: labels
+		havingAll: endNodeProps
+		whereIn: whereClauseBuilder
+		pathProcessIn: [ :path | path count > 0 ]
+		returnIn: [ :r | r ].
+	result records ifEmpty: [ ^ false ].
+	^ result records first first
+]
+
+{ #category : 'actions-paths' }
+FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: startNodeId whereIn: whereClauseBuilder [
+	^ self
+		existsOneHopPathsTyped: typeOrTypes
+		direction: direction
+		from: startNodeId
+		havingAll: #()
+		endNodeWithLabels: #()
+		havingAll: #()
+		whereIn: whereClauseBuilder
 ]
 
 { #category : 'private' }
@@ -322,6 +552,11 @@ FkGraphDb >> firstRelationshipOrNilFrom: aFkQueryResult [
 	aFkQueryResult records ifEmpty: [ ^ nil ].
 	path := aFkQueryResult records first first.
 	^ FkGraphRelationship on: path relationships first in: self
+]
+
+{ #category : 'private' }
+FkGraphDb >> relationshipsFrom: aFkQueryResult [
+	^ aFkQueryResult records collect: [ :record | FkGraphRelationship on: record first in: self ]
 ]
 
 { #category : 'private' }
@@ -355,17 +590,109 @@ FkGraphDb >> endpoint [
 	^ self stick endpoint
 ]
 
+{ #category : 'global operations' }
+FkGraphDb >> allLabels [
+	| n query labels label result |
+	n := 'n' asCypherIdentifier.
+	query := CyQuery match: n asNode.
+	labels := 'labels' asCypherIdentifier.
+	(query addWith: (n labels as: labels)) beDistinct.
+	label := 'label' asCypherIdentifier.
+	query addUnwind: (labels deepCopy as: label).
+	(query addReturn: label) beDistinct.
+	result := self runReadOnlyCypher: query.
+	^ result records collect: [ :record | record first ]
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> allRelationshipTypes [
+	| r query result |
+	r := 'r' asCypherIdentifier.
+	query := CyQuery match: ('' asCypherIdentifier asNode - r asRelationship - '' asCypherIdentifier asNode).
+	(query addReturn: r type) beDistinct.
+	result := self runReadOnlyCypher: query.
+	^ result records collect: [ :record | record first ]
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> countNodes [
+	^ self countNodesLabeled: #()
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> countRelationships [
+	^ self countRelationshipsTyped: #()
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> deleteAll [
+	"FalkorDB's plain DELETE already detaches a node's relationships (see the class comment's
+	Implementation Points), so deleting all nodes already deletes all relationships too."
+
+	^ self deleteAllNodes
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> deleteAllNodes [
+	^ self deleteNodesLabeled: #() havingAll: #()
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> deleteAllRelationships [
+	^ self deleteRelationshipsTyped: #() havingAll: #()
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> orphanedNodes [
+	"FalkorDB's Cypher parser rejects exists() wrapped around an anonymous pattern expression
+	('Unable to resolve filtered alias') - NOT applied to the bare pattern works, so #not is used
+	here instead of the #exists not spelling that Neo4j/SCypherGraph would use."
+
+	| n query result |
+	n := 'n' asCypherIdentifier.
+	query := CyQuery
+		match: n asNode
+		where: (n asNode -- '' asCypherIdentifier asNode) not
+		return: n.
+	result := self runReadOnlyCypher: query.
+	^ self nodesFrom: result
+]
+
 { #category : 'actions-nodes' }
 FkGraphDb >> deleteNode: aFkGraphNode [
 	^ self deleteNodeAt: aFkGraphNode id
 ]
 
 { #category : 'actions-nodes' }
+FkGraphDb >> countNodesLabeled: labelOrLabels [
+	| n node query result |
+	n := 'n' asCypherIdentifier.
+	node := CyNode name: n labels: (self labelsFor: labelOrLabels).
+	query := CyQuery match: node.
+	query addReturn: n count.
+	result := self runReadOnlyCypher: query.
+	^ result records first first
+]
+
+{ #category : 'actions-nodes' }
 FkGraphDb >> deleteNodeAt: systemId [
+	^ self deleteNodeAt: systemId withRelations: false
+]
+
+{ #category : 'actions-nodes' }
+FkGraphDb >> deleteNodeAt: systemId withRelations: withRelations [
+	"withRelations has no observable effect on FalkorDB today - plain DELETE already detaches a
+	node's relationships (see the class comment's Implementation Points). Kept for API parity with
+	N4GraphDb's deleteNodeAt:withRelations:."
+
 	| n node query result |
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
-	query := CyQuery match: node where: (n getId equals: systemId) delete: node.
+	query := CyQuery
+		match: node
+		where: (n getId equals: systemId)
+		delete: node
+		in: [ :del | del withRelations: withRelations ].
 	result := self runCypher: query.
 	^ result statistics
 ]
@@ -400,7 +727,12 @@ FkGraphDb >> labelsFor: labelOrLabels [
 
 { #category : 'accessing' }
 FkGraphDb >> name [
-	^ name
+	^ name ifNil: [ self defaultName ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> defaultName [
+	^ 'default'
 ]
 
 { #category : 'private' }
@@ -509,8 +841,23 @@ FkGraphDb >> nodeAt: systemId propertyAt: key put: value [
 ]
 
 { #category : 'actions-nodes' }
+FkGraphDb >> nodeAt: systemId removePropertyAt: key [
+	| n node query result |
+	n := 'n' asCypherIdentifier.
+	node := CyNode name: n.
+	query := CyQuery match: node where: (n getId equals: systemId) remove: (n @ key).
+	result := self runCypher: query.
+	^ result statistics
+]
+
+{ #category : 'actions-nodes' }
 FkGraphDb >> nodesLabeled: labelOrLabels [
 	^ self nodesLabeled: labelOrLabels havingAll: #()
+]
+
+{ #category : 'actions-nodes' }
+FkGraphDb >> nodesLabeled: labelOrLabels having: key value: value [
+	^ self nodesLabeled: labelOrLabels where: [ :node | (node @ key) equals: value ]
 ]
 
 { #category : 'actions-nodes' }
@@ -531,14 +878,14 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder [
 ]
 
 { #category : 'actions-nodes' }
-FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder orderBy: orderByClause skip: skip limit: limit [
+FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder orderBy: orderByClauseBuilder skip: skip limit: limit [
 	| node query result |
 	node := 'n' asCypherIdentifier.
 	query := CyQuery
 		match: (CyNode name: node labels: (self labelsFor: labelOrLabels))
 		where: (whereClauseBuilder value: node)
 		return: node
-		orderBy: orderByClause
+		orderBy: (orderByClauseBuilder value: node)
 		skip: skip
 		limit: limit.
 	result := self runCypher: query.
