@@ -6,6 +6,7 @@ Coverage:
 - graph-object-api spec: ""Creating a handle that owns its connection""
 - graph-object-api spec: ""Creating a handle over an existing connection""
 - graph-object-api spec: ""Graph name is required""
+- graph-object-api spec: ""Graph name defaults when nil/unset""
 - graph-object-api spec: ""Exposing the low-level endpoint""
 - graph-object-api spec: ""Running raw Cypher through the handle""
 - graph-object-api spec: ""Creating and merging nodes""
@@ -49,6 +50,16 @@ FkGraphDbTest >> testEndpointAnswersFkGraphEndpoint [
 { #category : 'tests' }
 FkGraphDbTest >> testGraphNameIsRequired [
 	self deny: (FkGraphDb class canUnderstand: #on:)
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testNameDefaultsWhenNotSupplied [
+	self assert: FkGraphDb new name equals: 'default'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testNameDefaultsWhenNilIsPassedExplicitly [
+	self assert: (FkGraphDb named: nil) name equals: 'default'
 ]
 
 { #category : 'tests' }

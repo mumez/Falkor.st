@@ -6,6 +6,8 @@ settings the first time a connection is needed.
 
 Responsibility:
 - Hold a graph name together with the FkFalkorStick connection it is reached through
+- Lazily fall back to a default graph name (#defaultName) when none was supplied (e.g. nil passed
+  to #named:/#on:named:, or plain #new), mirroring how #stick lazily creates itself
 - Lazily create and connect an FkFalkorStick from FkSettings when none is supplied
 - Answer the FkGraphEndpoint (#endpoint) that runs GRAPH.* commands for this graph
 - Provide thin #runCypher:/#runReadOnlyCypher: wrappers so callers don't have to route
@@ -20,7 +22,7 @@ Public API and Key Messages:
 - FkGraphDb class >> named: - lazily creates and connects a stick from FkSettings default targetUrl
 - FkGraphDb class >> on:named: - uses an already-connected stick; graph name is required either way
 - #endpoint - self stick endpoint
-- #name - the graph name
+- #name - the graph name, lazily defaulting to #defaultName ('default') when nil
 - #runCypher: cypherQueryOrString - runs a raw Cypher string or a CyQuery (rendered via
   #cypherStringFor: first) as a write query
 - #runCypher:arguments: - like #runCypher: but binds a Dictionary of named parameters via
@@ -724,7 +726,12 @@ FkGraphDb >> labelsFor: labelOrLabels [
 
 { #category : 'accessing' }
 FkGraphDb >> name [
-	^ name
+	^ name ifNil: [ name := self defaultName ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> defaultName [
+	^ 'default'
 ]
 
 { #category : 'private' }
