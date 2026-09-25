@@ -5,7 +5,6 @@ relationship-CRUD convenience API against a real FalkorDB instance.
 Coverage:
 - graph-object-api spec: ""Creating a handle that owns its connection""
 - graph-object-api spec: ""Creating a handle over an existing connection""
-- graph-object-api spec: ""Graph name is required""
 - graph-object-api spec: ""Graph name defaults when nil/unset""
 - graph-object-api spec: ""Exposing the low-level endpoint""
 - graph-object-api spec: ""Running raw Cypher through the handle""
@@ -45,11 +44,6 @@ FkGraphDbTest >> testEndpointAnswersFkGraphEndpoint [
 	| db |
 	db := self db.
 	self assert: db endpoint class equals: FkGraphEndpoint
-]
-
-{ #category : 'tests' }
-FkGraphDbTest >> testGraphNameIsRequired [
-	self deny: (FkGraphDb class canUnderstand: #on:)
 ]
 
 { #category : 'tests' }

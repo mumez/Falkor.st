@@ -20,7 +20,8 @@ Collaborators:
 
 Public API and Key Messages:
 - FkGraphDb class >> named: - lazily creates and connects a stick from FkSettings default targetUrl
-- FkGraphDb class >> on:named: - uses an already-connected stick; graph name is required either way
+- FkGraphDb class >> on:named: - uses an already-connected stick; nil graph name defaults to
+  #defaultName ('default')
 - #endpoint - self stick endpoint
 - #name - the graph name, lazily defaulting to #defaultName ('default') when nil
 - #runCypher: cypherQueryOrString - runs a raw Cypher string or a CyQuery (rendered via
