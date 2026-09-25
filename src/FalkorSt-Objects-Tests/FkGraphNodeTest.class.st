@@ -349,7 +349,8 @@ FkGraphNodeTest >> testDeleteWithRelationsDeletesTheNodeAndItsRelationships [
 	alice := people first.
 	alice deleteWithRelations.
 	self assert: (self db nodeAt: alice id) isNil.
-	self assert: (self db countRelationships) equals: 0
+	self assert: (self db countRelationships) equals: 0.
+	self assert: alice isDeleted
 ]
 
 { #category : 'tests' }
