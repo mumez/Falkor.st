@@ -8,6 +8,8 @@ Coverage:
 - graph-object-api spec: ""Writing a property updates the graph and refreshes local state""
 - graph-object-api spec: ""No local-only mutation""
 - graph-object-api spec: ""Mutating a node deleted elsewhere signals a meaningful error""
+- graph-object-api spec: ""Property access/mutation after local delete signals a meaningful error""
+- graph-object-api spec: ""Delete is idempotent""
 - graph-object-api spec: ""Fetching one-hop relationships/end nodes in either direction""
 - graph-object-api spec: ""Filtering one-hop relationships by relationship/end-node property""
 - graph-object-api spec: ""Checking one-hop relationship existence without fetching it""
@@ -233,6 +235,54 @@ FkGraphNodeTest >> testMutatingANodeDeletedElsewhereSignalsANoSuchObjectError [
 		should: [ graphNode propertyAt: 'age' put: 31 ]
 		raise: FkGraphDbError
 		withExceptionDo: [ :ex | self assert: ex kind equals: #NoSuchObject ]
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testDeleteMarksTheGraphObjectAsDeleted [
+	| graphNode |
+	graphNode := self createGraphNode.
+	self deny: graphNode isDeleted.
+	graphNode delete.
+	self assert: graphNode isDeleted
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testPropertyAccessAfterDeleteSignalsAnAlreadyDeletedError [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode delete.
+	self
+		should: [ graphNode propertyAt: 'name' ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #AlreadyDeleted ].
+	self
+		should: [ graphNode properties ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #AlreadyDeleted ]
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testPropertyMutationAfterDeleteSignalsAnAlreadyDeletedError [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode delete.
+	self
+		should: [ graphNode propertyAt: 'age' put: 31 ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #AlreadyDeleted ].
+	self
+		should: [ graphNode removePropertyAt: 'age' ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #AlreadyDeleted ]
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testDeleteIsIdempotent [
+	| graphNode |
+	graphNode := self createGraphNode.
+	graphNode delete.
+	self shouldnt: [ graphNode delete ] raise: Error.
+	self assert: graphNode isDeleted
 ]
 
 { #category : 'tests' }

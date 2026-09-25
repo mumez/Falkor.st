@@ -17,6 +17,8 @@ Public API and Key Messages:
 - FkGraphDbError class >> unknownDirection - an #UnknownDirection-kind error, signaled by
   FkGraphRelationship's #ownNodeId/#otherNodeId when the relationship has no known traversal anchor
   (direction) to resolve own/other against
+- FkGraphDbError class >> alreadyDeleted - an #AlreadyDeleted-kind error, signaled by
+  FkGraphObject's property getters once the object has been #delete-d
 - #kind / #kind: - the symbolic error category
 "
 Class {
@@ -49,6 +51,11 @@ FkGraphDbError class >> invalidQuery [
 { #category : 'instance creation' }
 FkGraphDbError class >> unknownDirection [
 	^ self kind: #UnknownDirection
+]
+
+{ #category : 'instance creation' }
+FkGraphDbError class >> alreadyDeleted [
+	^ self kind: #AlreadyDeleted
 ]
 
 { #category : 'accessing' }
