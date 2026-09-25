@@ -726,7 +726,7 @@ FkGraphDb >> labelsFor: labelOrLabels [
 
 { #category : 'accessing' }
 FkGraphDb >> name [
-	^ name ifNil: [ name := self defaultName ]
+	^ name ifNil: [ self defaultName ]
 ]
 
 { #category : 'private' }
