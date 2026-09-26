@@ -10,6 +10,10 @@ Coverage:
   (FalkorDB serializes them as plain strings in verbose mode, indistinguishable from a genuine
   Cypher string on the wire - see FkQueryResult's class comment); that decoding, and Path value
   decoding, are covered instead by FkCompactQueryResultTest via the compact format.
+- #firstColumnValues on both non-empty and empty results
+- Safe record accessors (#recordsDo:, #firstRecordDo:[ifNone:], #oneValueDo:[ifNone:], #oneValue,
+  #oneValueIfNone:)
+  on both non-empty and empty results
 "
 Class {
 	#name : 'FkQueryResultTest',
@@ -76,4 +80,104 @@ FkQueryResultTest >> testQueryWithReturnClauseExposesHeaderRecordsAndStatistics 
 	self assertCollection: result header asArray equals: #('a').
 	self assert: result records isEmpty.
 	self assert: result statistics notEmpty
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstColumnValuesAnswersFirstValueOfEachRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2, 3] AS x RETURN x, x * 10'.
+	self assertCollection: result firstColumnValues asArray equals: #( 1 2 3 )
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstColumnValuesAnswersEmptyWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: result firstColumnValues isEmpty
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstRecordDoAnswersBlockValueForFirstRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2] AS x RETURN x, x * 10'.
+	self assert: (result firstRecordDo: [ :record | record second ]) equals: 10
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstRecordDoAnswersNilWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: (result firstRecordDo: [ :record | self fail ]) isNil
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstRecordDoIfNoneAnswersNoneBlockValueWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: (result firstRecordDo: [ :record | self fail ] ifNone: [ #none ]) equals: #none
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueAnswersFirstCellOfFirstRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2] AS x RETURN x, x * 10'.
+	self assert: result oneValue equals: 1
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueAnswersNilWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.
+	self assert: result oneValue isNil
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueIfNoneAnswersFirstCellOfFirstRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2] AS x RETURN x'.
+	self assert: (result oneValueIfNone: [ self fail ]) equals: 1
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueIfNoneAnswersNilForNullFirstCell [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'RETURN null'.
+	self assert: (result oneValueIfNone: [ self fail ]) isNil
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueIfNoneAnswersNoneBlockValueWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: (result oneValueIfNone: [ #none ]) equals: #none
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueDoAnswersBlockValueForFirstCell [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'RETURN 41'.
+	self assert: (result oneValueDo: [ :value | value + 1 ]) equals: 42
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueDoIfNoneAnswersNoneBlockValueWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: (result oneValueDo: [ :value | self fail ] ifNone: [ #none ]) equals: #none
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testRecordsDoEvaluatesBlockForEachRecord [
+	| result visited |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2, 3] AS x RETURN x'.
+	visited := OrderedCollection new.
+	result recordsDo: [ :record | visited add: record first ].
+	self assertCollection: visited asArray equals: #( 1 2 3 )
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testRecordsDoEvaluatesNothingWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.
+	result recordsDo: [ :record | self fail ]
 ]
