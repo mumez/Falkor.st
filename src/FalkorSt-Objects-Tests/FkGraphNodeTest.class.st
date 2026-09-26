@@ -425,6 +425,17 @@ FkGraphNodeTest >> testLabelAnswersNilWhenNoLabelsExist [
 ]
 
 { #category : 'tests' }
+FkGraphNodeTest >> testLabelsFromDbOnANodeDeletedElsewhereSignalsANoSuchObjectError [
+	| graphNode |
+	graphNode := self createGraphNode.
+	self endpoint graphQuery: self graphName cypher: 'MATCH (p) DELETE p'.
+	self
+		should: [ graphNode labelsFromDb ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #NoSuchObject ]
+]
+
+{ #category : 'tests' }
 FkGraphNodeTest >> testLabelsFromDbAnswersEmptyCollectionWhenNoLabelsExist [
 	| db person |
 	db := self db.

@@ -126,7 +126,8 @@ FkGraphNode >> labelsFromDb [
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) return: n labels.
 	result := self db runReadOnlyCypher: query.
-	^ result oneValue
+	^ result oneValue ifNil: [
+		FkGraphDbError noSuchObject signal: 'No graph object found for id ' , self id printString ]
 ]
 
 { #category : 'accessing-relationships-existence' }
