@@ -330,7 +330,7 @@ FkGraphDb >> countRelationshipsTyped: typeOrTypes [
 	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
 	query addReturn: r count.
 	result := self runReadOnlyCypher: query.
-	^ result oneValue
+	^ result oneValueIfNone: [ FkGraphDbError invalidQuery signal: 'Expected a count query to answer one record' ]
 ]
 
 { #category : 'actions-relationships' }
@@ -529,7 +529,7 @@ FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: star
 		whereIn: whereClauseBuilder
 		pathProcessIn: [ :path | path count > 0 ]
 		returnIn: [ :r | r ].
-	^ result oneValue ifNil: [ false ]
+	^ result oneValueIfNone: [ false ]
 ]
 
 { #category : 'actions-paths' }
@@ -665,7 +665,7 @@ FkGraphDb >> countNodesLabeled: labelOrLabels [
 	query := CyQuery match: node.
 	query addReturn: n count.
 	result := self runReadOnlyCypher: query.
-	^ result oneValue
+	^ result oneValueIfNone: [ FkGraphDbError invalidQuery signal: 'Expected a count query to answer one record' ]
 ]
 
 { #category : 'actions-nodes' }

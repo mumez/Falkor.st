@@ -11,7 +11,8 @@ Coverage:
   Cypher string on the wire - see FkQueryResult's class comment); that decoding, and Path value
   decoding, are covered instead by FkCompactQueryResultTest via the compact format.
 - #firstColumnValues on both non-empty and empty results
-- Safe record accessors (#recordsDo:, #firstRecordDo:[ifNone:], #oneValueDo:[ifNone:], #oneValue)
+- Safe record accessors (#recordsDo:, #firstRecordDo:[ifNone:], #oneValueDo:[ifNone:], #oneValue,
+  #oneValueIfNone:)
   on both non-empty and empty results
 "
 Class {
@@ -128,6 +129,27 @@ FkQueryResultTest >> testOneValueAnswersNilWhenNoRecords [
 	| result |
 	result := self endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.
 	self assert: result oneValue isNil
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueIfNoneAnswersFirstCellOfFirstRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2] AS x RETURN x'.
+	self assert: (result oneValueIfNone: [ self fail ]) equals: 1
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueIfNoneAnswersNilForNullFirstCell [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'RETURN null'.
+	self assert: (result oneValueIfNone: [ self fail ]) isNil
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testOneValueIfNoneAnswersNoneBlockValueWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: (result oneValueIfNone: [ #none ]) equals: #none
 ]
 
 { #category : 'tests - accessing' }

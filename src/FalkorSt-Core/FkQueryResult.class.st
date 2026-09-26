@@ -21,9 +21,9 @@ Public API and Key Messages:
 - #records - OrderedCollection of decoded rows, each row an OrderedCollection of decoded values
 - #statistics - OrderedCollection of statistic line Strings
 - #firstColumnValues - the first value of every record (e.g. for single-column RETURN queries)
-- #recordsDo:, #firstRecordDo:ifNone:, #oneValueDo:ifNone:, #oneValue - safe record accessors
-  that don't fail on an empty result (#oneValue answers nil both when there are no records and
-  when the first cell is a Cypher null)
+- #recordsDo:, #firstRecordDo:ifNone:, #oneValueDo:ifNone:, #oneValueIfNone:, #oneValue - safe
+  record accessors that don't fail on an empty result (#oneValue answers nil both when there are no
+  records and when the first cell is a Cypher null; use #oneValueIfNone: to tell them apart)
 
 Implementation Points:
 - In the verbose (non---compact) reply format, only null, integer, and string Cypher values are
@@ -245,6 +245,11 @@ FkQueryResult >> oneValueDo: aBlock [
 { #category : 'accessing' }
 FkQueryResult >> oneValueDo: aBlock ifNone: noneBlock [
 	^ self firstRecordDo: [ :record | aBlock value: record first ] ifNone: noneBlock
+]
+
+{ #category : 'accessing' }
+FkQueryResult >> oneValueIfNone: noneBlock [
+	^ self oneValueDo: [ :value | value ] ifNone: noneBlock
 ]
 
 { #category : 'accessing' }
