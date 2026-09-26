@@ -20,6 +20,7 @@ Public API and Key Messages:
 - #header - OrderedCollection of column name Strings (empty when the query had no RETURN clause)
 - #records - OrderedCollection of decoded rows, each row an OrderedCollection of decoded values
 - #statistics - OrderedCollection of statistic line Strings
+- #firstColumnValues - the first value of every record (e.g. for single-column RETURN queries)
 - #recordsDo:, #firstRecordDo:ifNone:, #oneValueDo:ifNone:, #oneValue - safe record accessors
   that don't fail on an empty result (#oneValue answers nil both when there are no records and
   when the first cell is a Cypher null)
@@ -202,6 +203,11 @@ FkQueryResult class >> fromVerboseReply: rawReply [
 		setHeader: rawReply first
 		records: (rawReply second collect: [ :rawRecord | self decodeVerboseRecord: rawRecord ])
 		statistics: rawReply third
+]
+
+{ #category : 'accessing' }
+FkQueryResult >> firstColumnValues [
+	^ self records collect: [ :record | record first ]
 ]
 
 { #category : 'accessing' }

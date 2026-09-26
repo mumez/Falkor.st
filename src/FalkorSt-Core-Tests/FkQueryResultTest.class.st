@@ -10,6 +10,7 @@ Coverage:
   (FalkorDB serializes them as plain strings in verbose mode, indistinguishable from a genuine
   Cypher string on the wire - see FkQueryResult's class comment); that decoding, and Path value
   decoding, are covered instead by FkCompactQueryResultTest via the compact format.
+- #firstColumnValues on both non-empty and empty results
 - Safe record accessors (#recordsDo:, #firstRecordDo:[ifNone:], #oneValueDo:[ifNone:], #oneValue)
   on both non-empty and empty results
 "
@@ -78,6 +79,20 @@ FkQueryResultTest >> testQueryWithReturnClauseExposesHeaderRecordsAndStatistics 
 	self assertCollection: result header asArray equals: #('a').
 	self assert: result records isEmpty.
 	self assert: result statistics notEmpty
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstColumnValuesAnswersFirstValueOfEachRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2, 3] AS x RETURN x, x * 10'.
+	self assertCollection: result firstColumnValues asArray equals: #( 1 2 3 )
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testFirstColumnValuesAnswersEmptyWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: result firstColumnValues isEmpty
 ]
 
 { #category : 'tests - accessing' }
