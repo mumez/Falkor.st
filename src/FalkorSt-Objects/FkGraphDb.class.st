@@ -330,7 +330,7 @@ FkGraphDb >> countRelationshipsTyped: typeOrTypes [
 	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
 	query addReturn: r count.
 	result := self runReadOnlyCypher: query.
-	^ result records first first
+	^ result oneValue
 ]
 
 { #category : 'actions-relationships' }
@@ -413,8 +413,7 @@ FkGraphDb >> relationshipAt: systemId [
 	rel := CyRelationship start: s end: e name: r.
 	query := CyQuery match: rel where: (r getId equals: systemId) return: r.
 	result := self runCypher: query.
-	result records ifEmpty: [ ^ nil ].
-	^ FkGraphRelationship on: result records first first in: self
+	^ result oneValueDo: [ :rawRelationship | FkGraphRelationship on: rawRelationship in: self ]
 ]
 
 { #category : 'actions-relationships' }
@@ -495,8 +494,8 @@ FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeI
 		whereIn: whereClauseBuilder
 		pathProcessIn: nil
 		returnIn: returnBlock.
-	returnBlock ifNil: [ ^ result records collect: [ :record | returner value: (FkGraphPath on: record first in: self direction: direction) ] ].
-	^ result records collect: [ :record | returner value: record first ]
+	returnBlock ifNil: [ ^ result firstColumnValues collect: [ :rawPath | returner value: (FkGraphPath on: rawPath in: self direction: direction) ] ].
+	^ result firstColumnValues collect: returner
 ]
 
 { #category : 'private' }
@@ -530,8 +529,7 @@ FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: star
 		whereIn: whereClauseBuilder
 		pathProcessIn: [ :path | path count > 0 ]
 		returnIn: [ :r | r ].
-	result records ifEmpty: [ ^ false ].
-	^ result records first first
+	^ result oneValue ifNil: [ false ]
 ]
 
 { #category : 'actions-paths' }
@@ -548,15 +546,12 @@ FkGraphDb >> existsOneHopPathsTyped: typeOrTypes direction: direction from: star
 
 { #category : 'private' }
 FkGraphDb >> firstRelationshipOrNilFrom: aFkQueryResult [
-	| path |
-	aFkQueryResult records ifEmpty: [ ^ nil ].
-	path := aFkQueryResult records first first.
-	^ FkGraphRelationship on: path relationships first in: self
+	^ aFkQueryResult oneValueDo: [ :path | FkGraphRelationship on: path relationships first in: self ]
 ]
 
 { #category : 'private' }
 FkGraphDb >> relationshipsFrom: aFkQueryResult [
-	^ aFkQueryResult records collect: [ :record | FkGraphRelationship on: record first in: self ]
+	^ aFkQueryResult firstColumnValues collect: [ :rawRelationship | FkGraphRelationship on: rawRelationship in: self ]
 ]
 
 { #category : 'private' }
@@ -572,8 +567,7 @@ FkGraphDb >> firstRelationshipFromCreatePathQuery: query returning: r [
 	query statements removeLast.
 	query addReturn: r.
 	result := self runCypher: query.
-	result records ifEmpty: [ ^ nil ].
-	^ FkGraphRelationship on: result records first first in: self
+	^ result oneValueDo: [ :rawRelationship | FkGraphRelationship on: rawRelationship in: self ]
 ]
 
 { #category : 'factory' }
@@ -601,7 +595,7 @@ FkGraphDb >> allLabels [
 	query addUnwind: (labels deepCopy as: label).
 	(query addReturn: label) beDistinct.
 	result := self runReadOnlyCypher: query.
-	^ result records collect: [ :record | record first ]
+	^ result firstColumnValues
 ]
 
 { #category : 'global operations' }
@@ -611,7 +605,7 @@ FkGraphDb >> allRelationshipTypes [
 	query := CyQuery match: ('' asCypherIdentifier asNode - r asRelationship - '' asCypherIdentifier asNode).
 	(query addReturn: r type) beDistinct.
 	result := self runReadOnlyCypher: query.
-	^ result records collect: [ :record | record first ]
+	^ result firstColumnValues
 ]
 
 { #category : 'global operations' }
@@ -671,7 +665,7 @@ FkGraphDb >> countNodesLabeled: labelOrLabels [
 	query := CyQuery match: node.
 	query addReturn: n count.
 	result := self runReadOnlyCypher: query.
-	^ result records first first
+	^ result oneValue
 ]
 
 { #category : 'actions-nodes' }
@@ -716,8 +710,7 @@ FkGraphDb >> deleteNodesLabeled: labelOrLabels where: whereClauseBuilder [
 
 { #category : 'private' }
 FkGraphDb >> firstNodeOrNilFrom: aFkQueryResult [
-	aFkQueryResult records ifEmpty: [ ^ nil ].
-	^ FkGraphNode on: aFkQueryResult records first first in: self
+	^ aFkQueryResult oneValueDo: [ :rawNode | FkGraphNode on: rawNode in: self ]
 ]
 
 { #category : 'private' }
@@ -908,7 +901,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder skip: skip li
 
 { #category : 'private' }
 FkGraphDb >> nodesFrom: aFkQueryResult [
-	^ aFkQueryResult records collect: [ :record | FkGraphNode on: record first in: self ]
+	^ aFkQueryResult firstColumnValues collect: [ :rawNode | FkGraphNode on: rawNode in: self ]
 ]
 
 { #category : 'private' }

@@ -221,7 +221,6 @@ FkGraphObject >> reload [
 	element := self matchElementNamed: n.
 	query := CyQuery match: element where: (n getId equals: self id) return: n.
 	result := self db runCypher: query.
-	result records ifEmpty: [
-		^ FkGraphDbError noSuchObject signal: 'No graph object found for id ' , self id printString ].
-	rawGraphObject := result records first first
+	rawGraphObject := result oneValue ifNil: [
+		^ FkGraphDbError noSuchObject signal: 'No graph object found for id ' , self id printString ]
 ]
