@@ -4,6 +4,7 @@ connection is needed - FkGraphPath only wraps raw values it is handed, it never 
 
 Coverage:
 - graph-object-api spec: ""Wrapping a path's nodes and relationships""
+- graph-object-api spec: ""A navigation origin is rejected for a path with more than one hop""
 "
 Class {
 	#name : 'FkGraphPathTest',
@@ -14,7 +15,12 @@ Class {
 
 { #category : 'creating' }
 FkGraphPathTest >> createGraphPath [
-	| rawStart rawEnd rawRel rawPath |
+	^ FkGraphPath on: self createRawPath in: nil
+]
+
+{ #category : 'creating' }
+FkGraphPathTest >> createRawPath [
+	| rawStart rawEnd rawRel |
 	rawStart := FkNode id: 1 labels: #('Person') properties: { 'name' -> 'Alice' } asDictionary.
 	rawEnd := FkNode id: 2 labels: #('Person') properties: { 'name' -> 'Bob' } asDictionary.
 	rawRel := FkRelationship
@@ -23,9 +29,8 @@ FkGraphPathTest >> createGraphPath [
 		startNodeId: 1
 		endNodeId: 2
 		properties: Dictionary new.
-	rawPath := FkPath nodes: (OrderedCollection with: rawStart with: rawEnd)
-		relationships: (OrderedCollection with: rawRel).
-	^ FkGraphPath on: rawPath in: nil
+	^ FkPath nodes: (OrderedCollection with: rawStart with: rawEnd)
+		relationships: (OrderedCollection with: rawRel)
 ]
 
 { #category : 'tests' }
@@ -33,6 +38,17 @@ FkGraphPathTest >> testEndNodeAnswersTheLastWrappedNode [
 	| graphPath |
 	graphPath := self createGraphPath.
 	self assert: graphPath endNode id equals: 2
+]
+
+{ #category : 'tests' }
+FkGraphPathTest >> testNavigatedFromRejectsAPathWithMoreThanOneRelationship [
+	| rawPath |
+	rawPath := self createRawPath.
+	rawPath relationships add: rawPath relationships first.
+	self
+		should: [ FkGraphPath on: rawPath in: nil navigatedFrom: 1 ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #MultiHopPathNotAllowed ]
 ]
 
 { #category : 'tests' }
@@ -70,4 +86,14 @@ FkGraphPathTest >> testStartNodeAnswersTheFirstWrappedNode [
 	| graphPath |
 	graphPath := self createGraphPath.
 	self assert: graphPath startNode id equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphPathTest >> testNavigatedFromBuildsOneRelationshipWithTheGivenNavigationOriginNodeId [
+	| graphPath relationships |
+	graphPath := FkGraphPath on: self createRawPath in: nil navigatedFrom: 1.
+	relationships := graphPath relationships.
+	self assert: relationships size equals: 1.
+	self assert: relationships first navigationOriginNodeId equals: 1.
+	self assert: graphPath relationships first == relationships first
 ]
