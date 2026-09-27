@@ -9,19 +9,19 @@ Responsibility:
 - Supply the CyRelationship pattern element (#matchElementNamed:) that FkGraphObject's #delete /
   #propertyAt:put: / #reload use to match myself by id
 - Fetch my start/end/head/tail node as an FkGraphNode via my FkGraphDb's #nodeAt:
-- Hold an optional traversal #direction (#in / #out / nil) used to resolve #ownNodeId/#otherNodeId
-  relative to the anchor node a path or one-hop query was fetched from
+- Hold an optional #navigationOriginNodeId - the id of the node a path or one-hop query was fetched
+  from - used to resolve #ownNode/#otherNode relative to that origin
 
 Collaborators:
 - FkRelationship: the decoded relationship I wrap, held as my inherited #rawGraphObject
 - FkGraphObject: my superclass, running the Cypher (built with SCypher's CyQuery/CyRelationship) my
   mutating operations need
-- FkGraphDbError: signaled by #ownNodeId/#otherNodeId when #direction is unknown (nil)
+- FkGraphDbError: signaled by #ownNode/#otherNode when I have no navigation origin to resolve against
 
 Public API and Key Messages:
 - FkGraphRelationship class >> on:in: - wraps an FkRelationship with the FkGraphDb it was fetched
-  through, #direction left unknown (nil) (inherited from FkGraphObject)
-- FkGraphRelationship class >> on:in:direction: - same, with an explicit #direction
+  through, with no navigation origin (inherited from FkGraphObject)
+- FkGraphRelationship class >> on:in:navigatedFrom: - same, with an explicit navigation origin node id
 - #id / #type / #startNodeId / #endNodeId / #properties / #propertyAt: - delegate to the wrapped
   FkRelationship
 - #propertyAt:put: - SETs the property in FalkorDB, then reloads the wrapped FkRelationship
@@ -31,44 +31,32 @@ Public API and Key Messages:
 - #rawRelationship - the wrapped FkRelationship (an alias for the inherited #rawGraphObject)
 - #startNode / #endNode - the relationship's raw start/end node, fetched and wrapped as an
   FkGraphNode
-- #direction - #in/#out/nil, the traversal anchor I was fetched relative to
-- #ownNodeId / #otherNodeId - the anchor/far node id relative to #direction (#out: own=start,
-  other=end; #in: own=end, other=start); signal FkGraphDbError (#UnknownDirection) when #direction
-  is nil, since own/other have no defined meaning without an anchor
-- #ownNode / #otherNode - #ownNodeId/#otherNodeId fetched and wrapped as an FkGraphNode
+- #navigationDirectionFrom: aNodeId - #out/#in/#unknown, aNodeId's relation to this relationship's
+  start/end
+- #ownNode / #otherNode - the node at #navigationOriginNodeId / the endpoint on the other side;
+  signal FkGraphDbError (#UnknownDirection) when there is no navigation origin
 
 Implementation Points:
-- #direction is nil unless explicitly supplied via #on:in:direction: - FkGraphDb's #relationshipAt:
-  and the create*/merge*RelationshipTyped:... factories have no traversal anchor, so relationships
-  they answer always have #direction nil; only relationships reached through a one-hop path/
-  relationship query anchored at one node (FkGraphNode's relationship-navigation API) carry a
-  #direction.
+- #navigationOriginNodeId is nil unless explicitly supplied via #on:in:navigatedFrom: - FkGraphDb's
+  #relationshipAt: and the create*/merge*RelationshipTyped: factories have no traversal anchor, so
+  relationships they answer always have a nil origin; only relationships reached through a one-hop
+  path/relationship query anchored at one node (FkGraphNode's relationship-navigation API) carry one.
 "
 Class {
 	#name : 'FkGraphRelationship',
 	#superclass : 'FkGraphObject',
 	#instVars : [
-		'direction'
+		'navigationOriginNodeId'
 	],
 	#category : 'FalkorSt-Objects',
 	#package : 'FalkorSt-Objects'
 }
 
 { #category : 'instance creation' }
-FkGraphRelationship class >> on: aFkRelationship in: aFkGraphDb direction: aSymbolOrNil [
+FkGraphRelationship class >> on: aFkRelationship in: aFkGraphDb navigatedFrom: aNavigationOriginNodeId [
 	^ (self on: aFkRelationship in: aFkGraphDb)
-		direction: aSymbolOrNil;
+		navigationOriginNodeId: aNavigationOriginNodeId;
 		yourself
-]
-
-{ #category : 'accessing' }
-FkGraphRelationship >> direction [
-	^ direction
-]
-
-{ #category : 'private' }
-FkGraphRelationship >> direction: anObject [
-	direction := anObject
 ]
 
 { #category : 'accessing' }
@@ -81,25 +69,58 @@ FkGraphRelationship >> endNodeId [
 	^ self rawGraphObject endNodeId
 ]
 
-{ #category : 'accessing' }
-FkGraphRelationship >> otherNode [
-	^ self db nodeAt: self otherNodeId
-]
-
-{ #category : 'accessing' }
-FkGraphRelationship >> otherNodeId [
-	self direction == #in ifTrue: [ ^ self startNodeId ].
-	self direction == #out ifTrue: [ ^ self endNodeId ].
-	^ FkGraphDbError unknownDirection
-		signal: 'Cannot determine other node: relationship direction is unknown'
-]
-
 { #category : 'private' }
 FkGraphRelationship >> matchElementNamed: anIdentifier [
 	| s e |
 	s := 's' asCypherIdentifier.
 	e := 'e' asCypherIdentifier.
 	^ CyRelationship start: s end: e name: anIdentifier
+]
+
+{ #category : 'accessing' }
+FkGraphRelationship >> navigationDirectionFrom: aNodeId [
+	aNodeId = self startNodeId ifTrue: [ ^ #out ].
+	aNodeId = self endNodeId ifTrue: [ ^ #in ].
+	^ #unknown
+]
+
+{ #category : 'private' }
+FkGraphRelationship >> navigationDirectionForOrigin [
+	^ self navigationDirectionFrom: self navigationOriginNodeId
+]
+
+{ #category : 'accessing' }
+FkGraphRelationship >> navigationOriginNodeId [
+	^ navigationOriginNodeId
+]
+
+{ #category : 'private' }
+FkGraphRelationship >> navigationOriginNodeId: anObject [
+	navigationOriginNodeId := anObject
+]
+
+{ #category : 'accessing' }
+FkGraphRelationship >> otherNode [
+	| direction |
+	direction := self navigationDirectionForOrigin.
+	direction == #out ifTrue: [ ^ self endNode ].
+	direction == #in ifTrue: [ ^ self startNode ].
+	^ self signalUnknownDirectionFor: 'other'
+]
+
+{ #category : 'accessing' }
+FkGraphRelationship >> ownNode [
+	| direction |
+	direction := self navigationDirectionForOrigin.
+	direction == #out ifTrue: [ ^ self startNode ].
+	direction == #in ifTrue: [ ^ self endNode ].
+	^ self signalUnknownDirectionFor: 'own'
+]
+
+{ #category : 'private' }
+FkGraphRelationship >> signalUnknownDirectionFor: aString [
+	^ FkGraphDbError unknownDirection
+		signal: 'Cannot determine ' , aString , ' node: relationship navigation origin is unknown'
 ]
 
 { #category : 'accessing' }
@@ -115,19 +136,6 @@ FkGraphRelationship >> startNode [
 { #category : 'accessing' }
 FkGraphRelationship >> startNodeId [
 	^ self rawGraphObject startNodeId
-]
-
-{ #category : 'accessing' }
-FkGraphRelationship >> ownNode [
-	^ self db nodeAt: self ownNodeId
-]
-
-{ #category : 'accessing' }
-FkGraphRelationship >> ownNodeId [
-	self direction == #in ifTrue: [ ^ self endNodeId ].
-	self direction == #out ifTrue: [ ^ self startNodeId ].
-	^ FkGraphDbError unknownDirection
-		signal: 'Cannot determine own node: relationship direction is unknown'
 ]
 
 { #category : 'accessing' }
