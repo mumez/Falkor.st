@@ -21,6 +21,8 @@ Public API and Key Messages:
 - #records - OrderedCollection of decoded rows, each row an OrderedCollection of decoded values
 - #statistics - OrderedCollection of statistic line Strings
 - #firstColumnValues - the first value of every record (e.g. for single-column RETURN queries)
+- #mappedRecords, #valuesAt: - records as column name -> value Dictionaries, or one named
+  column's values (empty for an unknown column)
 - #recordsDo:, #firstRecordDo:ifNone:, #oneValueDo:ifNone:, #oneValueIfNone:, #oneValue - safe
   record accessors that don't fail on an empty result (#oneValue answers nil both when there are no
   records and when the first cell is a Cypher null; use #oneValueIfNone: to tell them apart)
@@ -233,6 +235,15 @@ FkQueryResult >> header: anObject [
 ]
 
 { #category : 'accessing' }
+FkQueryResult >> mappedRecords [
+	^ self records collect: [ :record |
+		| columnNameToValue |
+		columnNameToValue := Dictionary new.
+		self header with: record do: [ :columnName :value | columnNameToValue at: columnName put: value ].
+		columnNameToValue ]
+]
+
+{ #category : 'accessing' }
 FkQueryResult >> oneValue [
 	^ self oneValueDo: [ :value | value ]
 ]
@@ -277,6 +288,14 @@ FkQueryResult >> setHeader: aHeaderCollection records: aRecordsCollection statis
 { #category : 'accessing' }
 FkQueryResult >> statistics [
 	^ statistics
+]
+
+{ #category : 'accessing' }
+FkQueryResult >> valuesAt: columnName [
+	| columnIndex |
+	columnIndex := self header indexOf: columnName.
+	columnIndex = 0 ifTrue: [ ^ #() ].
+	^ self records collect: [ :record | record at: columnIndex ]
 ]
 
 { #category : 'private' }

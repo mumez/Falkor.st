@@ -10,7 +10,7 @@ Coverage:
   (FalkorDB serializes them as plain strings in verbose mode, indistinguishable from a genuine
   Cypher string on the wire - see FkQueryResult's class comment); that decoding, and Path value
   decoding, are covered instead by FkCompactQueryResultTest via the compact format.
-- #firstColumnValues on both non-empty and empty results
+- #firstColumnValues, #mappedRecords, #valuesAt: on both non-empty and empty results
 - Safe record accessors (#recordsDo:, #firstRecordDo:[ifNone:], #oneValueDo:[ifNone:], #oneValue,
   #oneValueIfNone:)
   on both non-empty and empty results
@@ -94,6 +94,45 @@ FkQueryResultTest >> testFirstColumnValuesAnswersEmptyWhenNoRecords [
 	| result |
 	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
 	self assert: result firstColumnValues isEmpty
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testMappedRecordsAnswersColumnNameToValueDictionaryForEachRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2] AS x RETURN x, x * 10 AS y'.
+	self
+		assertCollection: result mappedRecords asArray
+		equals: {
+			(Dictionary new at: 'x' put: 1; at: 'y' put: 10; yourself).
+			(Dictionary new at: 'x' put: 2; at: 'y' put: 20; yourself) }
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testMappedRecordsAnswersEmptyWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: result mappedRecords isEmpty
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testValuesAtAnswersValuesOfNamedColumnFromEachRecord [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2, 3] AS x RETURN x, x * 10 AS y'.
+	self assertCollection: (result valuesAt: 'y') asArray equals: #( 10 20 30 )
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testValuesAtAnswersEmptyForUnknownColumn [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'UNWIND [1, 2, 3] AS x RETURN x'.
+	self assert: (result valuesAt: 'unknown') isEmpty
+]
+
+{ #category : 'tests - accessing' }
+FkQueryResultTest >> testValuesAtAnswersEmptyWhenNoRecords [
+	| result |
+	result := self endpoint graphQuery: self graphName cypher: 'MATCH (a) RETURN a'.
+	self assert: (result valuesAt: 'a') isEmpty
 ]
 
 { #category : 'tests - accessing' }
