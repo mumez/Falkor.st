@@ -55,6 +55,9 @@ FkGraphPath class >> on: aFkPath in: aFkGraphDb [
 
 { #category : 'instance creation' }
 FkGraphPath class >> on: aFkPath in: aFkGraphDb navigatedFrom: aNavigationOriginNodeId [
+	"A navigation origin is only unambiguous for a one-hop path"
+
+	self assert: aFkPath relationships size <= 1.
 	^ self new
 		rawPath: aFkPath;
 		db: aFkGraphDb;

@@ -85,7 +85,7 @@ FkGraphRelationship >> navigationDirectionFrom: aNodeId [
 ]
 
 { #category : 'private' }
-FkGraphRelationship >> navigationDirection [
+FkGraphRelationship >> navigationDirectionForOrigin [
 	^ self navigationDirectionFrom: self navigationOriginNodeId
 ]
 
@@ -100,22 +100,23 @@ FkGraphRelationship >> navigationOriginNodeId: anObject [
 ]
 
 { #category : 'private' }
-FkGraphRelationship >> signalUnknownDirection: aString [
-	^ FkGraphDbError unknownDirection signal: aString
+FkGraphRelationship >> nodeWhenOut: outNodeBlock whenIn: inNodeBlock describedAs: aString [
+	| direction |
+	direction := self navigationDirectionForOrigin.
+	direction == #out ifTrue: [ ^ outNodeBlock value ].
+	direction == #in ifTrue: [ ^ inNodeBlock value ].
+	^ FkGraphDbError unknownDirection
+		signal: 'Cannot determine ' , aString , ' node: relationship navigation origin is unknown'
 ]
 
 { #category : 'accessing' }
 FkGraphRelationship >> otherNode [
-	self navigationDirection == #out ifTrue: [ ^ self endNode ].
-	self navigationDirection == #in ifTrue: [ ^ self startNode ].
-	^ self signalUnknownDirection: 'Cannot determine other node: relationship navigation origin is unknown'
+	^ self nodeWhenOut: [ self endNode ] whenIn: [ self startNode ] describedAs: 'other'
 ]
 
 { #category : 'accessing' }
 FkGraphRelationship >> ownNode [
-	self navigationDirection == #out ifTrue: [ ^ self startNode ].
-	self navigationDirection == #in ifTrue: [ ^ self endNode ].
-	^ self signalUnknownDirection: 'Cannot determine own node: relationship navigation origin is unknown'
+	^ self nodeWhenOut: [ self startNode ] whenIn: [ self endNode ] describedAs: 'own'
 ]
 
 { #category : 'accessing' }

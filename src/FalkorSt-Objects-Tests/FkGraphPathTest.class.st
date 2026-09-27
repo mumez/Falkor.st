@@ -40,6 +40,14 @@ FkGraphPathTest >> testEndNodeAnswersTheLastWrappedNode [
 ]
 
 { #category : 'tests' }
+FkGraphPathTest >> testNavigatedFromRejectsAPathWithMoreThanOneRelationship [
+	| rawPath |
+	rawPath := self createRawPath.
+	rawPath relationships add: rawPath relationships first.
+	self should: [ FkGraphPath on: rawPath in: nil navigatedFrom: 1 ] raise: AssertionFailure
+]
+
+{ #category : 'tests' }
 FkGraphPathTest >> testNodesAnswersEachElementWrappedAsAFkGraphNode [
 	| graphPath nodes |
 	graphPath := self createGraphPath.
