@@ -19,6 +19,9 @@ Public API and Key Messages:
   resolve own/other against
 - FkGraphDbError class >> alreadyDeleted - an #AlreadyDeleted-kind error, signaled by
   FkGraphObject's property getters once the object has been #delete-d
+- FkGraphDbError class >> multiHopPathNotAllowed - a #MultiHopPathNotAllowed-kind error, signaled by
+  FkGraphPath class >> #on:in:navigatedFrom: when the given path has more than one hop, since that
+  constructor is only for one-hop paths anchored at a single navigation origin
 - #kind / #kind: - the symbolic error category
 "
 Class {
@@ -56,6 +59,11 @@ FkGraphDbError class >> unknownDirection [
 { #category : 'instance creation' }
 FkGraphDbError class >> alreadyDeleted [
 	^ self kind: #AlreadyDeleted
+]
+
+{ #category : 'instance creation' }
+FkGraphDbError class >> multiHopPathNotAllowed [
+	^ self kind: #MultiHopPathNotAllowed
 ]
 
 { #category : 'accessing' }

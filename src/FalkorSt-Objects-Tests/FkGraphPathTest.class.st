@@ -4,6 +4,7 @@ connection is needed - FkGraphPath only wraps raw values it is handed, it never 
 
 Coverage:
 - graph-object-api spec: ""Wrapping a path's nodes and relationships""
+- graph-object-api spec: ""A navigation origin is rejected for a path with more than one hop""
 "
 Class {
 	#name : 'FkGraphPathTest',
@@ -44,7 +45,10 @@ FkGraphPathTest >> testNavigatedFromRejectsAPathWithMoreThanOneRelationship [
 	| rawPath |
 	rawPath := self createRawPath.
 	rawPath relationships add: rawPath relationships first.
-	self should: [ FkGraphPath on: rawPath in: nil navigatedFrom: 1 ] raise: AssertionFailure
+	self
+		should: [ FkGraphPath on: rawPath in: nil navigatedFrom: 1 ]
+		raise: FkGraphDbError
+		withExceptionDo: [ :ex | self assert: ex kind equals: #MultiHopPathNotAllowed ]
 ]
 
 { #category : 'tests' }

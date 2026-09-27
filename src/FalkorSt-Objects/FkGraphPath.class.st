@@ -16,6 +16,8 @@ Collaborators:
 - FkGraphNode / FkGraphRelationship: what my #nodes / #relationships wrap the raw path's elements
   into
 - FkGraphDb: the handle I and my wrapped nodes/relationships were fetched through
+- FkGraphDbError: signaled by #on:in:navigatedFrom: when the given path has more than one hop, since
+  that constructor is only for one-hop paths
 
 Public API and Key Messages:
 - FkGraphPath class >> on:in: - wraps a raw FkPath with the FkGraphDb it was fetched through;
@@ -57,7 +59,9 @@ FkGraphPath class >> on: aFkPath in: aFkGraphDb [
 FkGraphPath class >> on: aFkPath in: aFkGraphDb navigatedFrom: aNavigationOriginNodeId [
 	"A navigation origin is only unambiguous for a one-hop path"
 
-	self assert: aFkPath relationships size <= 1.
+	aFkPath relationships size > 1 ifTrue: [
+		^ FkGraphDbError multiHopPathNotAllowed
+			signal: 'Cannot navigate a multi-hop path from a single origin: one-hop paths only' ].
 	^ self new
 		rawPath: aFkPath;
 		db: aFkGraphDb;
