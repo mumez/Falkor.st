@@ -8,8 +8,8 @@ Responsibility:
 - Hold a decoded FkPath together with the FkGraphDb it was fetched through
 - Wrap the raw FkPath's nodes and relationships as FkGraphNode/FkGraphRelationship, so callers never
   see raw FkNode/FkRelationship values off a path
-- Hold an optional traversal #direction (#in / #out / nil), passed through to each wrapped
-  FkGraphRelationship so its #ownNodeId/#otherNodeId can resolve
+- For a one-hop path fetched anchored at one node, give its single wrapped FkGraphRelationship that
+  node as its navigation origin, so #ownNode/#otherNode can resolve
 
 Collaborators:
 - FkPath: the decoded path I wrap, held as my #rawPath
@@ -18,20 +18,19 @@ Collaborators:
 - FkGraphDb: the handle I and my wrapped nodes/relationships were fetched through
 
 Public API and Key Messages:
-- FkGraphPath class >> on:in: - wraps a raw FkPath with the FkGraphDb it was fetched through,
-  #direction left unknown (nil)
-- FkGraphPath class >> on:in:direction: - same, with an explicit #direction
+- FkGraphPath class >> on:in: - wraps a raw FkPath with the FkGraphDb it was fetched through;
+  #relationships wraps the raw relationships with no navigation origin
+- FkGraphPath class >> on:in:navigatedFrom: - for one-hop paths: wraps the raw path's single
+  relationship with the given navigation origin node id at construction time
 - #nodes - an OrderedCollection of FkGraphNode, in path order
-- #relationships - an OrderedCollection of FkGraphRelationship, in path order, each given my
-  #direction
+- #relationships - an OrderedCollection of FkGraphRelationship, in path order
 - #startNode / #endNode - the first/last element of #nodes
-- #direction - #in/#out/nil, the traversal anchor this path was fetched relative to
 - #rawPath - the wrapped FkPath
 
 Implementation Points:
-- #direction is only meaningful for a path fetched anchored at one node (today, always a one-hop
-  path with exactly one relationship, unambiguously anchored) - see FkGraphDb's class comment for
-  the #in/#out/nil convention.
+- A navigation origin is only meaningful for a path fetched anchored at one node (today, always a
+  one-hop path with exactly one relationship, unambiguously anchored) - see FkGraphDb's class comment
+  for the #in/#out/nil query-direction convention this is built from.
 "
 Class {
 	#name : 'FkGraphPath',
@@ -39,7 +38,7 @@ Class {
 	#instVars : [
 		'rawPath',
 		'db',
-		'direction'
+		'relationships'
 	],
 	#category : 'FalkorSt-Objects',
 	#package : 'FalkorSt-Objects'
@@ -50,29 +49,23 @@ FkGraphPath class >> on: aFkPath in: aFkGraphDb [
 	^ self new
 		rawPath: aFkPath;
 		db: aFkGraphDb;
+		relationships: (aFkPath relationships collect: [ :each | FkGraphRelationship on: each in: aFkGraphDb ]);
 		yourself
 ]
 
 { #category : 'instance creation' }
-FkGraphPath class >> on: aFkPath in: aFkGraphDb direction: aSymbolOrNil [
-	^ (self on: aFkPath in: aFkGraphDb)
-		direction: aSymbolOrNil;
+FkGraphPath class >> on: aFkPath in: aFkGraphDb navigatedFrom: aNavigationOriginNodeId [
+	^ self new
+		rawPath: aFkPath;
+		db: aFkGraphDb;
+		relationships: (aFkPath relationships collect: [ :each |
+			FkGraphRelationship on: each in: aFkGraphDb navigatedFrom: aNavigationOriginNodeId ]);
 		yourself
 ]
 
 { #category : 'accessing' }
 FkGraphPath >> db [
 	^ db
-]
-
-{ #category : 'accessing' }
-FkGraphPath >> direction [
-	^ direction
-]
-
-{ #category : 'private' }
-FkGraphPath >> direction: anObject [
-	direction := anObject
 ]
 
 { #category : 'private' }
@@ -102,8 +95,12 @@ FkGraphPath >> rawPath: anObject [
 
 { #category : 'accessing' }
 FkGraphPath >> relationships [
-	^ self rawPath relationships
-		collect: [ :each | FkGraphRelationship on: each in: self db direction: self direction ]
+	^ relationships
+]
+
+{ #category : 'private' }
+FkGraphPath >> relationships: anObject [
+	relationships := anObject
 ]
 
 { #category : 'accessing' }

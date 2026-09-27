@@ -15,8 +15,8 @@ Public API and Key Messages:
 - FkGraphDbError class >> invalidQuery - an #InvalidQuery-kind error, signaled when a CyQuery built
   by the high-level API is not shaped as expected (e.g. a missing trailing CyReturn)
 - FkGraphDbError class >> unknownDirection - an #UnknownDirection-kind error, signaled by
-  FkGraphRelationship's #ownNodeId/#otherNodeId when the relationship has no known traversal anchor
-  (direction) to resolve own/other against
+  FkGraphRelationship's #ownNode/#otherNode when the relationship has no navigation origin node to
+  resolve own/other against
 - FkGraphDbError class >> alreadyDeleted - an #AlreadyDeleted-kind error, signaled by
   FkGraphObject's property getters once the object has been #delete-d
 - #kind / #kind: - the symbolic error category

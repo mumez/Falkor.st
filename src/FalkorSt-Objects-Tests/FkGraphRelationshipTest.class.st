@@ -1,12 +1,13 @@
 "
-I test FkGraphRelationship's endpoint accessors (#startNode/#endNode/#ownNode/#otherNode) and
-inherited bulk property mutators against a real FalkorDB instance, including the anchor-relative
-direction convention #ownNodeId/#otherNodeId depend on.
+I test FkGraphRelationship's endpoint accessors (#startNode/#endNode/#ownNode/#otherNode), its
+#navigationDirectionFrom: resolution, and inherited bulk property mutators against a real FalkorDB
+instance, including the navigation-origin convention #ownNode/#otherNode depend on.
 
 Coverage:
 - graph-object-api spec: ""Fetching a relationship's start/end node""
-- graph-object-api spec: ""Resolving own/other node relative to the traversal anchor""
-- graph-object-api spec: ""A relationship with no known direction signals an error on own/other""
+- graph-object-api spec: ""Resolving own/other node relative to the navigation origin""
+- graph-object-api spec: ""A relationship with no navigation origin signals an error on own/other""
+- graph-object-api spec: ""Resolving a navigation direction from an arbitrary node id""
 - graph-object-api spec: ""Bulk property SET/MERGE/REMOVE on a relationship, inherited from
   FkGraphObject""
 "
@@ -81,28 +82,73 @@ FkGraphRelationshipTest >> testOwnAndOtherResolveCorrectlyForInRelationship [
 ]
 
 { #category : 'tests' }
-FkGraphRelationshipTest >> testOtherNodeIdSignalsUnknownDirectionWhenDirectionIsNotSet [
+FkGraphRelationshipTest >> testOtherNodeSignalsUnknownDirectionWhenNavigationOriginIsNotSet [
 	| db people alice rel |
 	db := self db.
 	people := self createAliceKnowsBobIn: db.
 	alice := people first.
 	rel := db relationshipAt: (db relationshipsTyped: 'KNOWS') first id.
 	self
-		should: [ rel otherNodeId ]
+		should: [ rel otherNode ]
 		raise: FkGraphDbError
 		withExceptionDo: [ :ex | self assert: ex kind equals: #UnknownDirection ]
 ]
 
 { #category : 'tests' }
-FkGraphRelationshipTest >> testOwnNodeIdSignalsUnknownDirectionWhenDirectionIsNotSet [
+FkGraphRelationshipTest >> testOwnNodeSignalsUnknownDirectionWhenNavigationOriginIsNotSet [
 	| db people rel |
 	db := self db.
 	people := self createAliceKnowsBobIn: db.
 	rel := db relationshipAt: (db relationshipsTyped: 'KNOWS') first id.
 	self
-		should: [ rel ownNodeId ]
+		should: [ rel ownNode ]
 		raise: FkGraphDbError
 		withExceptionDo: [ :ex | self assert: ex kind equals: #UnknownDirection ]
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testNavigationDirectionFromAnswersOutForStartNodeId [
+	| db people alice rel |
+	db := self db.
+	people := self createAliceKnowsBobIn: db.
+	alice := people first.
+	rel := (db relationshipsTyped: 'KNOWS') first.
+	self assert: (rel navigationDirectionFrom: alice id) equals: #out
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testNavigationDirectionFromAnswersInForEndNodeId [
+	| db people bob rel |
+	db := self db.
+	people := self createAliceKnowsBobIn: db.
+	bob := people second.
+	rel := (db relationshipsTyped: 'KNOWS') first.
+	self assert: (rel navigationDirectionFrom: bob id) equals: #in
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testNavigationDirectionFromAnswersUnknownForUnrelatedNodeIdOrNil [
+	| db rel |
+	db := self db.
+	self createAliceKnowsBobIn: db.
+	rel := (db relationshipsTyped: 'KNOWS') first.
+	self assert: (rel navigationDirectionFrom: -1) equals: #unknown.
+	self assert: (rel navigationDirectionFrom: nil) equals: #unknown
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testOwnAndOtherResolveRelativeToTheQueriedNodeForAnUndirectedQuery [
+	| db people alice bob relFromAlice relFromBob |
+	db := self db.
+	people := self createAliceKnowsBobIn: db.
+	alice := people first.
+	bob := people second.
+	relFromAlice := (alice relationshipsTyped: 'KNOWS') first.
+	relFromBob := (bob relationshipsTyped: 'KNOWS') first.
+	self assert: relFromAlice ownNode id equals: alice id.
+	self assert: relFromAlice otherNode id equals: bob id.
+	self assert: relFromBob ownNode id equals: bob id.
+	self assert: relFromBob otherNode id equals: alice id
 ]
 
 { #category : 'tests' }
