@@ -160,3 +160,28 @@ FkCompactQueryResultTest >> testDecodesVectorValueAsFloats [
 	self assert: vector equals: #(1.5 2.0 -3.0).
 	self assert: (vector allSatisfy: [ :each | each isFloat ])
 ]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesTemporalValues [
+	| row |
+	row := (self endpoint
+		graphQuery: self graphName
+		cypher: 'RETURN localdatetime(''2024-01-02T03:04:05''), date(''2024-01-02''), localtime(''03:04:05''), duration(''P1DT2H'')')
+		records first.
+	self assert: row first equals: (DateAndTime year: 2024 month: 1 day: 2 hour: 3 minute: 4 second: 5 offset: Duration zero).
+	self assert: row first offset equals: Duration zero.
+	self assert: row second equals: (Date year: 2024 month: 1 day: 2).
+	self assert: row third equals: (Time hour: 3 minute: 4 second: 5).
+	self assert: row fourth equals: (Duration days: 1 hours: 2 minutes: 0 seconds: 0)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesTemporalValuesBeforeUnixEpochAndStoredAsProperties [
+	| properties |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Event {on: date(''1960-05-06''), at: localtime(''23:59:59'')})'.
+	properties := (self endpoint graphQuery: self graphName cypher: 'MATCH (e:Event) RETURN e') oneValue properties.
+	self assert: (properties at: 'on') equals: (Date year: 1960 month: 5 day: 6).
+	self assert: (properties at: 'at') equals: (Time hour: 23 minute: 59 second: 59)
+]

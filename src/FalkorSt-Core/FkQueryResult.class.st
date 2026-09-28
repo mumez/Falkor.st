@@ -144,7 +144,27 @@ FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy
 	typeCode = 10 ifTrue: [ ^ self decodeCompactMap: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_MAP"
 	typeCode = 11 ifTrue: [ ^ self decodeCompactPoint: rawValue ]. "VALUE_POINT"
 	typeCode = 12 ifTrue: [ ^ (rawValue collect: [ :each | (self decodeCompactDouble: each) asFloat ]) asArray ]. "VALUE_VECTORF32"
+	"Temporal values arrive as whole Unix-epoch seconds; sub-second precision is not sent"
+	typeCode = 13 ifTrue: [ ^ self dateAndTimeFromUnixSeconds: rawValue ]. "VALUE_DATETIME"
+	typeCode = 14 ifTrue: [ ^ self dateFromUnixSeconds: rawValue ]. "VALUE_DATE"
+	typeCode = 15 ifTrue: [ ^ (self dateAndTimeFromUnixSeconds: rawValue) asTime ]. "VALUE_TIME"
+	typeCode = 16 ifTrue: [ ^ Duration seconds: rawValue ]. "VALUE_DURATION"
 	^ rawValue "VALUE_UNKNOWN"
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> dateAndTimeFromUnixSeconds: seconds [
+	^ (DateAndTime fromUnixTime: seconds) asUTC
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> dateFromUnixSeconds: seconds [
+	"A Cypher date is a zone-less calendar date, so rebuild it as a plain Date rather than
+	one pinned to UTC (which would not equal a Date made with Date year:month:day:)"
+
+	| utcDateAndTime |
+	utcDateAndTime := self dateAndTimeFromUnixSeconds: seconds.
+	^ Date year: utcDateAndTime year month: utcDateAndTime month day: utcDateAndTime dayOfMonth
 ]
 
 { #category : 'private-compact' }
