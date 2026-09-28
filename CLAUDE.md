@@ -58,7 +58,10 @@ decoding are designed to converge on the *same* value objects: only the raw-valu
 (compact resolves label/type/property-key ids through per-graph caches on `FkGraphEndpoint`, populated via
 `db.labels()` / `db.relationshipTypes()` / `db.propertyKeys()` and refreshed on cache miss; verbose reads
 names directly off the wire). Downstream code should never need to know which format was used to decode a
-result — don't build format-specific value objects.
+result — don't build format-specific value objects. The one accepted gap: verbose replies carry no type
+information for boolean, double, list, map, path, point, vector, and temporal values (they arrive as
+plain strings), so those stay Strings in verbose mode rather than being guessed from their text; the
+default compact format decodes them to typed values (`FkPoint`, `DateAndTime`, ...).
 
 Full design rationale and rejected alternatives are in
 `openspec/changes/add-graph-query-support/design.md`; task-by-task implementation status is in

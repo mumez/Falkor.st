@@ -30,15 +30,19 @@ Public API and Key Messages:
 Implementation Points:
 - In the verbose (non---compact) reply format, only null, integer, and string Cypher values are
   distinguishable on the wire; FalkorDB serializes boolean, double, list, map, and path values as
-  plain strings containing their printed form (see FalkorDB's result-structure docs). Decoding
-  those into typed Smalltalk values or an FkPath therefore isn't reliable from a verbose reply
-  alone; such cells are exposed as their raw String there.
+  plain strings containing their printed form (see FalkorDB's result-structure docs), as are
+  point, vector, and temporal values. Decoding those into typed Smalltalk values or an FkPath
+  therefore isn't reliable from a verbose reply alone; such cells are exposed as their raw String
+  there.
 - Node/relationship cells are unambiguous in verbose mode (tagged nested arrays keyed by
   'id'/'labels'/'properties' or 'id'/'type'/'src_node'/'dest_node'/'properties') and are decoded
   in full, including recursively decoding their property values.
 - The compact format tags every value as a [ValueType, value] pair (see design.md Decision 7 for
   the full code table), which removes the verbose format's ambiguity: boolean, double, array, map,
-  and path values all decode to their proper Smalltalk/FkPath representation. Compact node/
+  and path values all decode to their proper Smalltalk/FkPath representation, points to FkPoint,
+  vectors to an Array of Floats, and datetime/date/time/duration to DateAndTime (UTC)/Date/Time/
+  Duration (whole seconds only; FalkorDB sends no sub-second part). FalkorDB's temporal values are
+  zone-less (localdatetime/localtime), so no stored offset is lost by answering them in UTC. Compact node/
   relationship label, type, and property-key ids are resolved to names via the FkGraphEndpoint
   passed to #fromCompactReply:resolvedBy:graph:.
 "
@@ -136,13 +140,52 @@ FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy
 	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
 	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
 	typeCode = 4 ifTrue: [ ^ rawValue = 'true' ]. "VALUE_BOOLEAN"
-	typeCode = 5 ifTrue: [ ^ (rawValue copyReplaceAll: 'e+' with: 'e') asNumber ]. "VALUE_DOUBLE"
+	typeCode = 5 ifTrue: [ ^ self decodeCompactFloat: rawValue ]. "VALUE_DOUBLE"
 	typeCode = 6 ifTrue: [ ^ rawValue collect: [ :cell | self decodeCompactCell: cell resolvedBy: anEndpoint graph: graphName ] ]. "VALUE_ARRAY"
 	typeCode = 7 ifTrue: [ ^ self decodeCompactRelationship: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_EDGE"
 	typeCode = 8 ifTrue: [ ^ self decodeCompactNode: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_NODE"
 	typeCode = 9 ifTrue: [ ^ self decodeCompactPath: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_PATH"
 	typeCode = 10 ifTrue: [ ^ self decodeCompactMap: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_MAP"
-	^ rawValue "VALUE_UNKNOWN/VALUE_POINT/VALUE_VECTORF32: not needed by this change, left undecoded"
+	typeCode = 11 ifTrue: [ ^ self decodeCompactPoint: rawValue ]. "VALUE_POINT"
+	typeCode = 12 ifTrue: [ ^ (rawValue collect: [ :each | self decodeCompactFloat: each ]) asArray ]. "VALUE_VECTORF32"
+	"DATETIME/DATE/TIME arrive as whole Unix-epoch seconds, DURATION as a whole-second span;
+	sub-second precision is not sent"
+	typeCode = 13 ifTrue: [ ^ self dateAndTimeFromUnixSeconds: rawValue ]. "VALUE_DATETIME"
+	typeCode = 14 ifTrue: [ ^ self dateFromUnixSeconds: rawValue ]. "VALUE_DATE"
+	typeCode = 15 ifTrue: [ ^ (self dateAndTimeFromUnixSeconds: rawValue) asTime ]. "VALUE_TIME"
+	typeCode = 16 ifTrue: [ ^ Duration seconds: rawValue ]. "VALUE_DURATION"
+	^ rawValue "VALUE_UNKNOWN"
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> dateAndTimeFromUnixSeconds: seconds [
+	^ (DateAndTime fromUnixTime: seconds) asUTC
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> dateFromUnixSeconds: seconds [
+	"A Cypher date is a zone-less calendar date, so rebuild it as a plain Date rather than
+	one pinned to UTC (which would not equal a Date made with Date year:month:day:)"
+
+	| utcDateAndTime |
+	utcDateAndTime := self dateAndTimeFromUnixSeconds: seconds.
+	^ Date year: utcDateAndTime year month: utcDateAndTime month day: utcDateAndTime dayOfMonth
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactFloat: rawString [
+	"FalkorDB prints integral doubles without a fraction (3.0 arrives as '3'), so force a Float"
+
+	^ (rawString copyReplaceAll: 'e+' with: 'e') asNumber asFloat
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactPoint: rawLatitudeLongitude [
+	"FalkorDB points are 2D: exactly [latitude, longitude]"
+
+	^ FkPoint
+		latitude: (self decodeCompactFloat: rawLatitudeLongitude first)
+		longitude: (self decodeCompactFloat: rawLatitudeLongitude second)
 ]
 
 { #category : 'private-verbose' }
