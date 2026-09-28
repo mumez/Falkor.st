@@ -30,15 +30,18 @@ Public API and Key Messages:
 Implementation Points:
 - In the verbose (non---compact) reply format, only null, integer, and string Cypher values are
   distinguishable on the wire; FalkorDB serializes boolean, double, list, map, and path values as
-  plain strings containing their printed form (see FalkorDB's result-structure docs). Decoding
-  those into typed Smalltalk values or an FkPath therefore isn't reliable from a verbose reply
-  alone; such cells are exposed as their raw String there.
+  plain strings containing their printed form (see FalkorDB's result-structure docs), as are
+  point, vector, and temporal values. Decoding those into typed Smalltalk values or an FkPath
+  therefore isn't reliable from a verbose reply alone; such cells are exposed as their raw String
+  there.
 - Node/relationship cells are unambiguous in verbose mode (tagged nested arrays keyed by
   'id'/'labels'/'properties' or 'id'/'type'/'src_node'/'dest_node'/'properties') and are decoded
   in full, including recursively decoding their property values.
 - The compact format tags every value as a [ValueType, value] pair (see design.md Decision 7 for
   the full code table), which removes the verbose format's ambiguity: boolean, double, array, map,
-  and path values all decode to their proper Smalltalk/FkPath representation. Compact node/
+  and path values all decode to their proper Smalltalk/FkPath representation, points to FkPoint,
+  vectors to an Array of Floats, and datetime/date/time/duration to DateAndTime (UTC)/Date/Time/
+  Duration (whole seconds only; FalkorDB sends no sub-second part). Compact node/
   relationship label, type, and property-key ids are resolved to names via the FkGraphEndpoint
   passed to #fromCompactReply:resolvedBy:graph:.
 "
