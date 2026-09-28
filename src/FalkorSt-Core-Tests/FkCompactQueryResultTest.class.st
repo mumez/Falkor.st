@@ -46,6 +46,17 @@ FkCompactQueryResultTest >> testDecodesDoublesInScientificNotation [
 ]
 
 { #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesIntegralDoublesAsFloats [
+	"FalkorDB sends 3.0 as '3' in compact mode; it must still decode to a Float"
+
+	| row |
+	row := (self endpoint graphQuery: self graphName cypher: 'RETURN 3.0 AS d, -0.0 AS z') records first.
+	self assert: row first equals: 3.0.
+	self assert: row first isFloat.
+	self assert: row second isFloat
+]
+
+{ #category : 'tests' }
 FkCompactQueryResultTest >> testDecodesPathValue [
 	| result path |
 	self endpoint

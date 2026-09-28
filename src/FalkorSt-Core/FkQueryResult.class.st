@@ -41,7 +41,8 @@ Implementation Points:
   the full code table), which removes the verbose format's ambiguity: boolean, double, array, map,
   and path values all decode to their proper Smalltalk/FkPath representation, points to FkPoint,
   vectors to an Array of Floats, and datetime/date/time/duration to DateAndTime (UTC)/Date/Time/
-  Duration (whole seconds only; FalkorDB sends no sub-second part). Compact node/
+  Duration (whole seconds only; FalkorDB sends no sub-second part). FalkorDB's temporal values are
+  zone-less (localdatetime/localtime), so no stored offset is lost by answering them in UTC. Compact node/
   relationship label, type, and property-key ids are resolved to names via the FkGraphEndpoint
   passed to #fromCompactReply:resolvedBy:graph:.
 "
@@ -139,15 +140,16 @@ FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy
 	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
 	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
 	typeCode = 4 ifTrue: [ ^ rawValue = 'true' ]. "VALUE_BOOLEAN"
-	typeCode = 5 ifTrue: [ ^ self decodeCompactDouble: rawValue ]. "VALUE_DOUBLE"
+	typeCode = 5 ifTrue: [ ^ self decodeCompactFloat: rawValue ]. "VALUE_DOUBLE"
 	typeCode = 6 ifTrue: [ ^ rawValue collect: [ :cell | self decodeCompactCell: cell resolvedBy: anEndpoint graph: graphName ] ]. "VALUE_ARRAY"
 	typeCode = 7 ifTrue: [ ^ self decodeCompactRelationship: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_EDGE"
 	typeCode = 8 ifTrue: [ ^ self decodeCompactNode: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_NODE"
 	typeCode = 9 ifTrue: [ ^ self decodeCompactPath: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_PATH"
 	typeCode = 10 ifTrue: [ ^ self decodeCompactMap: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_MAP"
 	typeCode = 11 ifTrue: [ ^ self decodeCompactPoint: rawValue ]. "VALUE_POINT"
-	typeCode = 12 ifTrue: [ ^ (rawValue collect: [ :each | (self decodeCompactDouble: each) asFloat ]) asArray ]. "VALUE_VECTORF32"
-	"Temporal values arrive as whole Unix-epoch seconds; sub-second precision is not sent"
+	typeCode = 12 ifTrue: [ ^ (rawValue collect: [ :each | self decodeCompactFloat: each ]) asArray ]. "VALUE_VECTORF32"
+	"DATETIME/DATE/TIME arrive as whole Unix-epoch seconds, DURATION as a whole-second span;
+	sub-second precision is not sent"
 	typeCode = 13 ifTrue: [ ^ self dateAndTimeFromUnixSeconds: rawValue ]. "VALUE_DATETIME"
 	typeCode = 14 ifTrue: [ ^ self dateFromUnixSeconds: rawValue ]. "VALUE_DATE"
 	typeCode = 15 ifTrue: [ ^ (self dateAndTimeFromUnixSeconds: rawValue) asTime ]. "VALUE_TIME"
@@ -171,15 +173,19 @@ FkQueryResult class >> dateFromUnixSeconds: seconds [
 ]
 
 { #category : 'private-compact' }
-FkQueryResult class >> decodeCompactDouble: rawString [
-	^ (rawString copyReplaceAll: 'e+' with: 'e') asNumber
+FkQueryResult class >> decodeCompactFloat: rawString [
+	"FalkorDB prints integral doubles without a fraction (3.0 arrives as '3'), so force a Float"
+
+	^ (rawString copyReplaceAll: 'e+' with: 'e') asNumber asFloat
 ]
 
 { #category : 'private-compact' }
 FkQueryResult class >> decodeCompactPoint: rawLatitudeLongitude [
+	"FalkorDB points are 2D: exactly [latitude, longitude]"
+
 	^ FkPoint
-		latitude: (self decodeCompactDouble: rawLatitudeLongitude first) asFloat
-		longitude: (self decodeCompactDouble: rawLatitudeLongitude second) asFloat
+		latitude: (self decodeCompactFloat: rawLatitudeLongitude first)
+		longitude: (self decodeCompactFloat: rawLatitudeLongitude second)
 ]
 
 { #category : 'private-verbose' }
