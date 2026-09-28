@@ -124,3 +124,39 @@ FkCompactQueryResultTest >> testVerboseAndCompactDecodeEquivalently [
 	self assertCollection: vNode labels asArray equals: cNode labels asArray.
 	self assert: vNode properties equals: cNode properties
 ]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesPointValue [
+	| point |
+	point := (self endpoint
+		graphQuery: self graphName
+		cypher: 'RETURN point({latitude: 35.68, longitude: 139.69}) AS p') oneValue.
+	self assert: point class equals: FkPoint.
+	"FalkorDB stores point coordinates as 32-bit floats"
+	self assert: (point latitude closeTo: 35.68 precision: 1.0e-5).
+	self assert: (point longitude closeTo: 139.69 precision: 1.0e-5)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesPointAndVectorNestedInCollectionsAndProperties [
+	| row node |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Place {location: point({latitude: 1.5, longitude: 2.5}), embedding: vecf32([0.5, 1.0])})'.
+	row := (self endpoint
+		graphQuery: self graphName
+		cypher: 'MATCH (n:Place) RETURN n, [n.location], {e: n.embedding}') records first.
+	node := row first.
+	self assert: (node properties at: 'location') equals: (FkPoint latitude: 1.5 longitude: 2.5).
+	self assert: (node properties at: 'embedding') equals: #(0.5 1.0).
+	self assert: row second first equals: (FkPoint latitude: 1.5 longitude: 2.5).
+	self assert: (row third at: 'e') equals: #(0.5 1.0)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesVectorValueAsFloats [
+	| vector |
+	vector := (self endpoint graphQuery: self graphName cypher: 'RETURN vecf32([1.5, 2.0, -3]) AS v') oneValue.
+	self assert: vector equals: #(1.5 2.0 -3.0).
+	self assert: (vector allSatisfy: [ :each | each isFloat ])
+]

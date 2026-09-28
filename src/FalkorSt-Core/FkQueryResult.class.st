@@ -136,13 +136,27 @@ FkQueryResult class >> decodeCompactValueType: typeCode raw: rawValue resolvedBy
 	typeCode = 2 ifTrue: [ ^ rawValue ]. "VALUE_STRING"
 	typeCode = 3 ifTrue: [ ^ rawValue ]. "VALUE_INTEGER"
 	typeCode = 4 ifTrue: [ ^ rawValue = 'true' ]. "VALUE_BOOLEAN"
-	typeCode = 5 ifTrue: [ ^ (rawValue copyReplaceAll: 'e+' with: 'e') asNumber ]. "VALUE_DOUBLE"
+	typeCode = 5 ifTrue: [ ^ self decodeCompactDouble: rawValue ]. "VALUE_DOUBLE"
 	typeCode = 6 ifTrue: [ ^ rawValue collect: [ :cell | self decodeCompactCell: cell resolvedBy: anEndpoint graph: graphName ] ]. "VALUE_ARRAY"
 	typeCode = 7 ifTrue: [ ^ self decodeCompactRelationship: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_EDGE"
 	typeCode = 8 ifTrue: [ ^ self decodeCompactNode: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_NODE"
 	typeCode = 9 ifTrue: [ ^ self decodeCompactPath: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_PATH"
 	typeCode = 10 ifTrue: [ ^ self decodeCompactMap: rawValue resolvedBy: anEndpoint graph: graphName ]. "VALUE_MAP"
-	^ rawValue "VALUE_UNKNOWN/VALUE_POINT/VALUE_VECTORF32: not needed by this change, left undecoded"
+	typeCode = 11 ifTrue: [ ^ self decodeCompactPoint: rawValue ]. "VALUE_POINT"
+	typeCode = 12 ifTrue: [ ^ (rawValue collect: [ :each | (self decodeCompactDouble: each) asFloat ]) asArray ]. "VALUE_VECTORF32"
+	^ rawValue "VALUE_UNKNOWN"
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactDouble: rawString [
+	^ (rawString copyReplaceAll: 'e+' with: 'e') asNumber
+]
+
+{ #category : 'private-compact' }
+FkQueryResult class >> decodeCompactPoint: rawLatitudeLongitude [
+	^ FkPoint
+		latitude: (self decodeCompactDouble: rawLatitudeLongitude first) asFloat
+		longitude: (self decodeCompactDouble: rawLatitudeLongitude second) asFloat
 ]
 
 { #category : 'private-verbose' }
