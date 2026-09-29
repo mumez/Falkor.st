@@ -94,6 +94,11 @@ Public API and Key Messages:
   FkSlowLogEntry and answering an OrderedCollection of them
 - #graphResetLog: - clear the graph's slowlog via GRAPH.SLOWLOG RESET, answering the raw
   status string
+- #queryTimeoutMsecs / #queryTimeoutMsecs: - the default TIMEOUT (milliseconds) applied to
+  GRAPH.QUERY/GRAPH.RO_QUERY; falls back to FkSettings default (read on every query) until set
+- #graphQuery:cypher:compact:timeout: / #graphQuery:cypher:params:compact:timeout: and their
+  #graphRoQuery:... counterparts - like the non-timeout variants but override the TIMEOUT argument
+  sent with this call only
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -117,7 +122,8 @@ Class {
 	#instVars : [
 		'labelCaches',
 		'relTypeCaches',
-		'propKeyCaches'
+		'propKeyCaches',
+		'queryTimeoutMsecs'
 	],
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
@@ -158,9 +164,14 @@ FkGraphEndpoint >> dictionaryFromFlatPairs: flatCollection [
 ]
 
 { #category : 'private' }
-FkGraphEndpoint >> executeGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact [
+FkGraphEndpoint >> executeGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
 	| rawReply |
-	rawReply := self rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact.
+	rawReply := self
+		rawGraphCommand: commandName
+		graph: graphName
+		cypher: cypherString
+		compact: useCompact
+		timeout: timeoutMsecsOrNil.
 	useCompact ifFalse: [ ^ FkQueryResult fromVerboseReply: rawReply ].
 	^ FkQueryResult
 		fromCompactReply: rawReply
@@ -339,10 +350,20 @@ FkGraphEndpoint >> graphQuery: graphName cypher: cypherString [
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphQuery: graphName cypher: cypherString compact: useCompact [
 	^ self
+		graphQuery: graphName
+		cypher: cypherString
+		compact: useCompact
+		timeout: self queryTimeoutMsecs
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphQuery: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
+	^ self
 		executeGraphCommand: 'GRAPH.QUERY'
 		graph: graphName
 		cypher: cypherString
 		compact: useCompact
+		timeout: timeoutMsecsOrNil
 ]
 
 { #category : 'commands-graph' }
@@ -359,6 +380,15 @@ FkGraphEndpoint >> graphQuery: graphName cypher: cypherString params: paramsDict
 ]
 
 { #category : 'commands-graph' }
+FkGraphEndpoint >> graphQuery: graphName cypher: cypherString params: paramsDictionary compact: useCompact timeout: timeoutMsecsOrNil [
+	^ self
+		graphQuery: graphName
+		cypher: (self prependParams: paramsDictionary to: cypherString)
+		compact: useCompact
+		timeout: timeoutMsecsOrNil
+]
+
+{ #category : 'commands-graph' }
 FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString [
 	^ self graphRoQuery: graphName cypher: cypherString compact: true
 ]
@@ -366,10 +396,20 @@ FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString [
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString compact: useCompact [
 	^ self
+		graphRoQuery: graphName
+		cypher: cypherString
+		compact: useCompact
+		timeout: self queryTimeoutMsecs
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
+	^ self
 		executeGraphCommand: 'GRAPH.RO_QUERY'
 		graph: graphName
 		cypher: cypherString
 		compact: useCompact
+		timeout: timeoutMsecsOrNil
 ]
 
 { #category : 'commands-graph' }
@@ -383,6 +423,15 @@ FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString params: paramsDi
 		graphRoQuery: graphName
 		cypher: (self prependParams: paramsDictionary to: cypherString)
 		compact: useCompact
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphRoQuery: graphName cypher: cypherString params: paramsDictionary compact: useCompact timeout: timeoutMsecsOrNil [
+	^ self
+		graphRoQuery: graphName
+		cypher: (self prependParams: paramsDictionary to: cypherString)
+		compact: useCompact
+		timeout: timeoutMsecsOrNil
 ]
 
 { #category : 'accessing' }
@@ -415,10 +464,44 @@ FkGraphEndpoint >> prependParams: paramsDictionary to: cypherString [
 
 { #category : 'private' }
 FkGraphEndpoint >> rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact [
+	^ self
+		rawGraphCommand: commandName
+		graph: graphName
+		cypher: cypherString
+		compact: useCompact
+		timeout: nil
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> rawGraphCommand: commandName graph: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
+	^ self
+		unifiedCommand:
+			(self
+				graphCommandArgsFor: commandName
+				graph: graphName
+				cypher: cypherString
+				compact: useCompact
+				timeout: timeoutMsecsOrNil)
+]
+
+{ #category : 'private' }
+FkGraphEndpoint >> graphCommandArgsFor: commandName graph: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
 	| args |
 	args := OrderedCollection with: commandName with: graphName with: cypherString.
+	(timeoutMsecsOrNil notNil and: [ timeoutMsecsOrNil > 0 ])
+		ifTrue: [ args add: 'TIMEOUT'; add: timeoutMsecsOrNil asString ].
 	useCompact ifTrue: [ args add: '--compact' ].
-	^ self unifiedCommand: args
+	^ args
+]
+
+{ #category : 'accessing' }
+FkGraphEndpoint >> queryTimeoutMsecs [
+	^ queryTimeoutMsecs ifNil: [ FkSettings default queryTimeoutMsecs ]
+]
+
+{ #category : 'accessing' }
+FkGraphEndpoint >> queryTimeoutMsecs: anInteger [
+	queryTimeoutMsecs := anInteger
 ]
 
 { #category : 'accessing' }
