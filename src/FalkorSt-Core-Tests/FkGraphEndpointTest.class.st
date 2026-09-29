@@ -20,7 +20,8 @@ Coverage:
 - graph-list spec: listing graph names present in the keyspace
 - graph-copy spec: copying a graph's data into a new graph name
 - graph-memory spec: reporting per-graph memory usage statistics, decoded into a Dictionary
-- graph-slowlog spec: reporting the graph's slowest queries, decoded into FkSlowLogEntry instances
+- graph-slowlog spec: reporting the graph's slowest queries, decoded into FkSlowLogEntry instances,
+  and clearing them via #graphResetLog:
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -320,6 +321,18 @@ FkGraphEndpointTest >> testGraphSlowLogDecodesParametersWhenQueryWasBoundWithThe
 FkGraphEndpointTest >> testGraphSlowLogAnswersEmptyForGraphWithoutSlowQueries [
 	| reply |
 	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := self endpoint graphSlowLog: self graphName.
+	self assert: reply class equals: OrderedCollection.
+	self assert: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphResetLogClearsEntries [
+	| resetReply reply |
+	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self deny: (self endpoint graphSlowLog: self graphName) isEmpty.
+	resetReply := self endpoint graphResetLog: self graphName.
+	self assert: resetReply equals: 'OK'.
 	reply := self endpoint graphSlowLog: self graphName.
 	self assert: reply class equals: OrderedCollection.
 	self assert: reply isEmpty

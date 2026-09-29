@@ -19,8 +19,9 @@ Responsibility:
   GRAPH.CONFIG's parameter list, GRAPH.CONSTRAINT's PENDING/OK status string,
   GRAPH.EXPLAIN/GRAPH.PROFILE's plain-text plan, GRAPH.LIST's array of graph names, and
   GRAPH.COPY's status string are not FkQueryResult-shaped)
-- Send GRAPH.MEMORY USAGE and GRAPH.SLOWLOG commands via #unifiedCommand:, decoding their flat/
-  nested raw replies into a usable Dictionary and OrderedCollection of FkSlowLogEntry respectively
+- Send GRAPH.MEMORY USAGE and GRAPH.SLOWLOG (including RESET) commands via #unifiedCommand:,
+  decoding USAGE/SLOWLOG replies into a Dictionary and OrderedCollection of FkSlowLogEntry
+  respectively (RESET answers the raw status string)
 - Render Smalltalk parameter values as Cypher literals for the CYPHER prefix convention
 - Decode GRAPH.QUERY/GRAPH.RO_QUERY raw replies into an FkQueryResult before answering them
 - Cache and resolve label/relationship-type/property-key ids to names for compact decoding, one
@@ -91,6 +92,8 @@ Public API and Key Messages:
   the estimation
 - #graphSlowLog: - report the graph's slowest queries (up to 10), decoding each raw entry into an
   FkSlowLogEntry and answering an OrderedCollection of them
+- #graphResetLog: - clear the graph's slowlog via GRAPH.SLOWLOG RESET, answering the raw
+  status string
 
 Implementation Points:
 - Query errors surface as raised RsGenericError exceptions (see FkFalkorStick>>defaultRedisGenericErrorHandingBlock),
@@ -321,6 +324,11 @@ FkGraphEndpoint >> graphProfile: graphName cypher: cypherString params: paramsDi
 FkGraphEndpoint >> graphSlowLog: graphName [
 	^ (self unifiedCommand: { 'GRAPH.SLOWLOG'. graphName })
 		collect: [ :rawEntry | self slowLogEntryFrom: rawEntry ]
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphResetLog: graphName [
+	^ self unifiedCommand: { 'GRAPH.SLOWLOG'. graphName. 'RESET' }
 ]
 
 { #category : 'commands-graph' }
