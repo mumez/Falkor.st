@@ -31,6 +31,9 @@ Public API and Key Messages:
   parameter instead of being inlined into the Cypher string
 - #runReadOnlyCypher: cypherQueryOrString - same as #runCypher:, as a read-only query
 - #runReadOnlyCypher:arguments: - like #runCypher:arguments:, as a read-only query
+- #runCypher:arguments:timeout: / #runReadOnlyCypher:arguments:timeout: - like #runCypher:arguments:
+  / #runReadOnlyCypher:arguments: but override the GRAPH.QUERY/GRAPH.RO_QUERY TIMEOUT for this call
+  only, instead of #settings queryTimeoutMsecs
 - #createNodeLabeled: / #createNodeLabeled:properties: - CREATE a node with the given label(s),
   answering it wrapped as an FkGraphNode
 - #mergeNodeLabeled: / #mergeNodeLabeled:properties: - MERGE (create-if-absent) a node with the
@@ -741,30 +744,50 @@ FkGraphDb >> cypherStringFor: aCypherQueryOrString [
 
 { #category : 'querying' }
 FkGraphDb >> runCypher: cypherQueryOrString [
-	^ self endpoint graphQuery: self name cypher: (self cypherStringFor: cypherQueryOrString)
+	^ self runCypher: cypherQueryOrString arguments: Dictionary new
 ]
 
 { #category : 'querying' }
 FkGraphDb >> runCypher: cypherQueryOrString arguments: argsDict [
 	^ self
+		runCypher: cypherQueryOrString
+		arguments: argsDict
+		timeout: self settings queryTimeoutMsecs
+]
+
+{ #category : 'querying' }
+FkGraphDb >> runCypher: cypherQueryOrString arguments: argsDict timeout: timeoutMsecsOrNil [
+	^ self
 		endpoint
 		graphQuery: self name
 		cypher: (self cypherStringFor: cypherQueryOrString)
 		params: argsDict
+		compact: true
+		timeout: timeoutMsecsOrNil
 ]
 
 { #category : 'querying' }
 FkGraphDb >> runReadOnlyCypher: cypherQueryOrString [
-	^ self endpoint graphRoQuery: self name cypher: (self cypherStringFor: cypherQueryOrString)
+	^ self runReadOnlyCypher: cypherQueryOrString arguments: Dictionary new
 ]
 
 { #category : 'querying' }
 FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict [
 	^ self
+		runReadOnlyCypher: cypherQueryOrString
+		arguments: argsDict
+		timeout: self settings queryTimeoutMsecs
+]
+
+{ #category : 'querying' }
+FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict timeout: timeoutMsecsOrNil [
+	^ self
 		endpoint
 		graphRoQuery: self name
 		cypher: (self cypherStringFor: cypherQueryOrString)
 		params: argsDict
+		compact: true
+		timeout: timeoutMsecsOrNil
 ]
 
 { #category : 'actions-nodes' }

@@ -31,6 +31,108 @@ Class {
 }
 
 { #category : 'tests' }
+FkGraphEndpointTest >> testGraphCommandArgsOmitsTimeoutWhenNil [
+	| args |
+	args := self endpoint
+		graphCommandArgs: 'GRAPH.QUERY'
+		graph: self graphName
+		cypher: 'RETURN 1'
+		compact: true
+		timeout: nil.
+	self deny: (args includes: 'TIMEOUT')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphCommandArgsOmitsTimeoutWhenZero [
+	| args |
+	args := self endpoint
+		graphCommandArgs: 'GRAPH.QUERY'
+		graph: self graphName
+		cypher: 'RETURN 1'
+		compact: true
+		timeout: 0.
+	self deny: (args includes: 'TIMEOUT')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphCommandArgsIncludesTimeoutAndValueWhenPositive [
+	| args timeoutIndex |
+	args := self endpoint
+		graphCommandArgs: 'GRAPH.QUERY'
+		graph: self graphName
+		cypher: 'RETURN 1'
+		compact: true
+		timeout: 1000.
+	self assert: (args includes: 'TIMEOUT').
+	timeoutIndex := args indexOf: 'TIMEOUT'.
+	self assert: (args at: timeoutIndex + 1) equals: '1000'
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testQueryTimeoutMsecsDefaultsToFkSettingsDefault [
+	| originalDefault endpoint |
+	originalDefault := FkSettings default queryTimeoutMsecs.
+	[
+		FkSettings default queryTimeoutMsecs: 4242.
+		endpoint := FkGraphEndpoint new.
+		self assert: endpoint queryTimeoutMsecs equals: 4242 ]
+		ensure: [ FkSettings default queryTimeoutMsecs: originalDefault ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testQueryTimeoutMsecsCanBeOverriddenPerEndpoint [
+	| endpoint |
+	endpoint := FkGraphEndpoint new.
+	endpoint queryTimeoutMsecs: 999.
+	self assert: endpoint queryTimeoutMsecs equals: 999
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphRoQueryWithTinyTimeoutSignalsRsGenericError [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self should: [
+		self endpoint
+			graphRoQuery: self graphName
+			cypher: 'UNWIND range(1, 100000000) AS x RETURN count(x)'
+			compact: true
+			timeout: 1 ]
+		raise: RsGenericError
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphQueryWithTinyTimeoutSignalsRsGenericError [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self should: [
+		self endpoint
+			graphQuery: self graphName
+			cypher: 'UNWIND range(1, 100000000) AS x RETURN count(x)'
+			compact: true
+			timeout: 1 ]
+		raise: RsGenericError
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphRoQueryWithGenerousTimeoutSucceeds [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self assert:
+		((self endpoint
+			graphRoQuery: self graphName
+			cypher: 'MATCH (p:Person) RETURN count(p)'
+			compact: true
+			timeout: 10000) records first first) equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphQueryWithGenerousTimeoutSucceeds [
+	self assert:
+		((self endpoint
+			graphQuery: self graphName
+			cypher: 'RETURN 1'
+			compact: true
+			timeout: 10000) records first first) equals: 1
+]
+
+{ #category : 'tests' }
 FkGraphEndpointTest >> testGraphRoQueryDecodesNodeValue [
 	| result node |
 	self endpoint
