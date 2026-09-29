@@ -80,6 +80,26 @@ FkGraphDbTest >> testRunCypherRunsAWriteQuery [
 ]
 
 { #category : 'tests' }
+FkGraphDbTest >> testRunCypherArgumentsTimeoutWithGenerousTimeoutSucceeds [
+	| db |
+	db := self db.
+	self assert:
+		(db runCypher: 'RETURN 1' arguments: Dictionary new timeout: 10000) records first first
+		equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRunReadOnlyCypherArgumentsTimeoutWithGenerousTimeoutSucceeds [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person)'.
+	self assert:
+		(db runReadOnlyCypher: 'MATCH (p:Person) RETURN count(p)' arguments: Dictionary new timeout: 10000)
+			records first first
+		equals: 1
+]
+
+{ #category : 'tests' }
 FkGraphDbTest >> testRunReadOnlyCypherRunsAReadQuery [
 	| db |
 	db := self db.

@@ -46,6 +46,17 @@ FkCompactQueryResultTest >> testDecodesDoublesInScientificNotation [
 ]
 
 { #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesIntegralDoublesAsFloats [
+	"FalkorDB sends 3.0 as '3' in compact mode; it must still decode to a Float"
+
+	| row |
+	row := (self endpoint graphQuery: self graphName cypher: 'RETURN 3.0 AS d, -0.0 AS z') records first.
+	self assert: row first equals: 3.0.
+	self assert: row first isFloat.
+	self assert: row second isFloat
+]
+
+{ #category : 'tests' }
 FkCompactQueryResultTest >> testDecodesPathValue [
 	| result path |
 	self endpoint
@@ -123,4 +134,65 @@ FkCompactQueryResultTest >> testVerboseAndCompactDecodeEquivalently [
 	self assert: vNode id equals: cNode id.
 	self assertCollection: vNode labels asArray equals: cNode labels asArray.
 	self assert: vNode properties equals: cNode properties
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesPointValue [
+	| point |
+	point := (self endpoint
+		graphQuery: self graphName
+		cypher: 'RETURN point({latitude: 35.68, longitude: 139.69}) AS p') oneValue.
+	self assert: point class equals: FkPoint.
+	"FalkorDB stores point coordinates as 32-bit floats"
+	self assert: (point latitude closeTo: 35.68 precision: 1.0e-5).
+	self assert: (point longitude closeTo: 139.69 precision: 1.0e-5)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesPointAndVectorNestedInCollectionsAndProperties [
+	| row node |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Place {location: point({latitude: 1.5, longitude: 2.5}), embedding: vecf32([0.5, 1.0])})'.
+	row := (self endpoint
+		graphQuery: self graphName
+		cypher: 'MATCH (n:Place) RETURN n, [n.location], {e: n.embedding}') records first.
+	node := row first.
+	self assert: (node properties at: 'location') equals: (FkPoint latitude: 1.5 longitude: 2.5).
+	self assert: (node properties at: 'embedding') equals: #(0.5 1.0).
+	self assert: row second first equals: (FkPoint latitude: 1.5 longitude: 2.5).
+	self assert: (row third at: 'e') equals: #(0.5 1.0)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesVectorValueAsFloats [
+	| vector |
+	vector := (self endpoint graphQuery: self graphName cypher: 'RETURN vecf32([1.5, 2.0, -3]) AS v') oneValue.
+	self assert: vector equals: #(1.5 2.0 -3.0).
+	self assert: (vector allSatisfy: [ :each | each isFloat ])
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesTemporalValues [
+	| row |
+	row := (self endpoint
+		graphQuery: self graphName
+		cypher: 'RETURN localdatetime(''2024-01-02T03:04:05''), date(''2024-01-02''), localtime(''03:04:05''), duration(''P1DT2H'')')
+		records first.
+	self assert: row first equals: (DateAndTime year: 2024 month: 1 day: 2 hour: 3 minute: 4 second: 5 offset: Duration zero).
+	self assert: row first offset equals: Duration zero.
+	self assert: row second equals: (Date year: 2024 month: 1 day: 2).
+	self assert: row third equals: (Time hour: 3 minute: 4 second: 5).
+	self assert: row fourth equals: (Duration days: 1 hours: 2 minutes: 0 seconds: 0)
+]
+
+{ #category : 'tests' }
+FkCompactQueryResultTest >> testDecodesTemporalValuesBeforeUnixEpochAndStoredAsProperties [
+	| properties |
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Event {on: date(''1960-05-06''), at: localtime(''23:59:59'')})'.
+	properties := (self endpoint graphQuery: self graphName cypher: 'MATCH (e:Event) RETURN e') oneValue properties.
+	self assert: (properties at: 'on') equals: (Date year: 1960 month: 5 day: 6).
+	self assert: (properties at: 'at') equals: (Time hour: 23 minute: 59 second: 59)
 ]
