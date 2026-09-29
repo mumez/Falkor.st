@@ -33,7 +33,8 @@ Public API and Key Messages:
 - #runReadOnlyCypher:arguments: - like #runCypher:arguments:, as a read-only query
 - #runCypher:arguments:timeout: / #runReadOnlyCypher:arguments:timeout: - like #runCypher:arguments:
   / #runReadOnlyCypher:arguments: but override the GRAPH.QUERY/GRAPH.RO_QUERY TIMEOUT for this call
-  only, instead of #settings queryTimeoutMsecs
+  only. The other #run... methods use my own #settings queryTimeoutMsecs, which may differ from the
+  endpoint's default (the endpoint's own #queryTimeoutMsecs, falling back to FkSettings default)
 - #createNodeLabeled: / #createNodeLabeled:properties: - CREATE a node with the given label(s),
   answering it wrapped as an FkGraphNode
 - #mergeNodeLabeled: / #mergeNodeLabeled:properties: - MERGE (create-if-absent) a node with the

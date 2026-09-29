@@ -34,7 +34,7 @@ Class {
 FkGraphEndpointTest >> testGraphCommandArgsOmitsTimeoutWhenNil [
 	| args |
 	args := self endpoint
-		graphCommandArgs: 'GRAPH.QUERY'
+		graphCommandArgsFor: 'GRAPH.QUERY'
 		graph: self graphName
 		cypher: 'RETURN 1'
 		compact: true
@@ -46,7 +46,7 @@ FkGraphEndpointTest >> testGraphCommandArgsOmitsTimeoutWhenNil [
 FkGraphEndpointTest >> testGraphCommandArgsOmitsTimeoutWhenZero [
 	| args |
 	args := self endpoint
-		graphCommandArgs: 'GRAPH.QUERY'
+		graphCommandArgsFor: 'GRAPH.QUERY'
 		graph: self graphName
 		cypher: 'RETURN 1'
 		compact: true
@@ -56,16 +56,16 @@ FkGraphEndpointTest >> testGraphCommandArgsOmitsTimeoutWhenZero [
 
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphCommandArgsIncludesTimeoutAndValueWhenPositive [
-	| args timeoutIndex |
+	| args |
 	args := self endpoint
-		graphCommandArgs: 'GRAPH.QUERY'
+		graphCommandArgsFor: 'GRAPH.QUERY'
 		graph: self graphName
 		cypher: 'RETURN 1'
 		compact: true
 		timeout: 1000.
-	self assert: (args includes: 'TIMEOUT').
-	timeoutIndex := args indexOf: 'TIMEOUT'.
-	self assert: (args at: timeoutIndex + 1) equals: '1000'
+	self
+		assert: args asArray
+		equals: { 'GRAPH.QUERY'. self graphName. 'RETURN 1'. 'TIMEOUT'. '1000'. '--compact' }
 ]
 
 { #category : 'tests' }
@@ -76,6 +76,19 @@ FkGraphEndpointTest >> testQueryTimeoutMsecsDefaultsToFkSettingsDefault [
 		FkSettings default queryTimeoutMsecs: 4242.
 		endpoint := FkGraphEndpoint new.
 		self assert: endpoint queryTimeoutMsecs equals: 4242 ]
+		ensure: [ FkSettings default queryTimeoutMsecs: originalDefault ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testQueryTimeoutMsecsFollowsLaterFkSettingsChanges [
+	| originalDefault endpoint |
+	originalDefault := FkSettings default queryTimeoutMsecs.
+	[
+		endpoint := FkGraphEndpoint new.
+		FkSettings default queryTimeoutMsecs: 100.
+		self assert: endpoint queryTimeoutMsecs equals: 100.
+		FkSettings default queryTimeoutMsecs: 200.
+		self assert: endpoint queryTimeoutMsecs equals: 200 ]
 		ensure: [ FkSettings default queryTimeoutMsecs: originalDefault ]
 ]
 
@@ -93,7 +106,7 @@ FkGraphEndpointTest >> testGraphRoQueryWithTinyTimeoutSignalsRsGenericError [
 	self should: [
 		self endpoint
 			graphRoQuery: self graphName
-			cypher: 'UNWIND range(1, 100000000) AS x RETURN count(x)'
+			cypher: 'UNWIND range(1, 1000000) AS x RETURN count(x)'
 			compact: true
 			timeout: 1 ]
 		raise: RsGenericError
@@ -105,7 +118,7 @@ FkGraphEndpointTest >> testGraphQueryWithTinyTimeoutSignalsRsGenericError [
 	self should: [
 		self endpoint
 			graphQuery: self graphName
-			cypher: 'UNWIND range(1, 100000000) AS x RETURN count(x)'
+			cypher: 'UNWIND range(1, 1000000) AS x RETURN count(x)'
 			compact: true
 			timeout: 1 ]
 		raise: RsGenericError

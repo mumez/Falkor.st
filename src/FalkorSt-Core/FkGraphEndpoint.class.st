@@ -95,7 +95,7 @@ Public API and Key Messages:
 - #graphResetLog: - clear the graph's slowlog via GRAPH.SLOWLOG RESET, answering the raw
   status string
 - #queryTimeoutMsecs / #queryTimeoutMsecs: - the default TIMEOUT (milliseconds) applied to
-  GRAPH.QUERY/GRAPH.RO_QUERY when not overridden, lazily defaulting to FkSettings default
+  GRAPH.QUERY/GRAPH.RO_QUERY; falls back to FkSettings default (read on every query) until set
 - #graphQuery:cypher:compact:timeout: / #graphQuery:cypher:params:compact:timeout: and their
   #graphRoQuery:... counterparts - like the non-timeout variants but override the TIMEOUT argument
   sent with this call only
@@ -477,7 +477,7 @@ FkGraphEndpoint >> rawGraphCommand: commandName graph: graphName cypher: cypherS
 	^ self
 		unifiedCommand:
 			(self
-				graphCommandArgs: commandName
+				graphCommandArgsFor: commandName
 				graph: graphName
 				cypher: cypherString
 				compact: useCompact
@@ -485,18 +485,18 @@ FkGraphEndpoint >> rawGraphCommand: commandName graph: graphName cypher: cypherS
 ]
 
 { #category : 'private' }
-FkGraphEndpoint >> graphCommandArgs: commandName graph: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
+FkGraphEndpoint >> graphCommandArgsFor: commandName graph: graphName cypher: cypherString compact: useCompact timeout: timeoutMsecsOrNil [
 	| args |
 	args := OrderedCollection with: commandName with: graphName with: cypherString.
-	useCompact ifTrue: [ args add: '--compact' ].
 	(timeoutMsecsOrNil notNil and: [ timeoutMsecsOrNil > 0 ])
 		ifTrue: [ args add: 'TIMEOUT'; add: timeoutMsecsOrNil asString ].
+	useCompact ifTrue: [ args add: '--compact' ].
 	^ args
 ]
 
 { #category : 'accessing' }
 FkGraphEndpoint >> queryTimeoutMsecs [
-	^ queryTimeoutMsecs ifNil: [ queryTimeoutMsecs := FkSettings default queryTimeoutMsecs ]
+	^ queryTimeoutMsecs ifNil: [ FkSettings default queryTimeoutMsecs ]
 ]
 
 { #category : 'accessing' }
