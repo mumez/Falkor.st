@@ -23,7 +23,8 @@ FkGraphEndpoint >> graphCallProcedure: graphName procedure: procedureName argume
 FkGraphEndpoint >> graphCallProcedure: graphName procedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil readOnly: aBoolean [
 	"Call a stored procedure (equivalent to falkordb-py's call_procedure). Arguments are bound
 	as query parameters ($param0, $param1, ...), never string-concatenated into the query.
-	yieldNamesOrNil is nil for no YIELD clause, or a collection of column names to YIELD.
+	yieldNamesOrNil is nil (or empty) for no YIELD clause, a single column name String, or a
+	collection of column names to YIELD.
 	aBoolean true routes the call through GRAPH.RO_QUERY, false through GRAPH.QUERY."
 
 	| cypherString params |
@@ -42,11 +43,14 @@ FkGraphEndpoint >> procedureCallCypherFor: procedureName arguments: argumentsCol
 	"Answer the CALL <procedure>($param0, ...) [YIELD ...] Cypher fragment for a procedure call,
 	referencing arguments by parameter name rather than embedding their values."
 
-	| paramExpressions call |
+	| paramExpressions call yieldNames |
 	paramExpressions := (1 to: argumentsCollection size)
 		collect: [ :i | (self procedureCallParamNameAt: i) asCypherParameter ].
 	call := CyCall of: procedureName arguments: paramExpressions asArray.
-	yieldNamesOrNil ifNotNil: [ call yield: (CyYield withAll: yieldNamesOrNil asArray) ].
+	yieldNames := yieldNamesOrNil isString
+		ifTrue: [ { yieldNamesOrNil } ]
+		ifFalse: [ yieldNamesOrNil ].
+	yieldNames isEmptyOrNil ifFalse: [ call yield: (CyYield withAll: yieldNames asArray) ].
 	^ call cypherString trimRight
 ]
 

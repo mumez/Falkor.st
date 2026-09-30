@@ -42,6 +42,20 @@ FkGraphEndpointProcedureCallTest >> testProcedureCallCypherForMultipleYieldNames
 ]
 
 { #category : 'tests' }
+FkGraphEndpointProcedureCallTest >> testProcedureCallCypherForYieldStringIsSingleName [
+	self
+		assert: (self endpoint procedureCallCypherFor: 'db.labels' arguments: #() yield: 'label')
+		equals: 'CALL db.labels() YIELD label'
+]
+
+{ #category : 'tests' }
+FkGraphEndpointProcedureCallTest >> testProcedureCallCypherForEmptyYieldOmitsYield [
+	self
+		assert: (self endpoint procedureCallCypherFor: 'db.labels' arguments: #() yield: #())
+		equals: 'CALL db.labels()'
+]
+
+{ #category : 'tests' }
 FkGraphEndpointProcedureCallTest >> testProcedureCallParamsForBuildsIndexedParamDictionary [
 	self
 		assert: (self endpoint procedureCallParamsFor: #('a' 'b'))
@@ -64,11 +78,11 @@ FkGraphEndpointProcedureCallTest >> testGraphCallProcedureProcedureAnswersLabels
 { #category : 'tests' }
 FkGraphEndpointProcedureCallTest >> testGraphCallProcedureArgumentsWithQuotesPassesThroughSafely [
 	| awkward result |
-	awkward := self createFulltextIndexedPersonNamed: 'She said "hi" \ bye'.
+	awkward := self createFulltextIndexedPersonNamed: 'She said "hi" to O''Brien'.
 	result := self endpoint
 		graphCallProcedure: self graphName
 		procedure: 'db.idx.fulltext.queryNodes'
-		arguments: { 'Person'. 'hi' }
+		arguments: { 'Person'. '"hi" O''Brien' }
 		yield: #('node')
 		readOnly: false.
 	self assert: (result records collect: [ :row | row first properties at: 'name' ]) asArray equals: { awkward }
