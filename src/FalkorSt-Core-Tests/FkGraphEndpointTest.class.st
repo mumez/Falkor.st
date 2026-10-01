@@ -554,7 +554,7 @@ FkGraphEndpointTest >> testGraphIndexCreateBySucceedsForEachKindAndEntity [
 FkGraphEndpointTest >> testGraphIndexCreateWithSucceeds [
 	| index result |
 	index := FkGraphIndex new.
-	index range; node: 'Person'; props: #('email').
+	self indexCreateSpecs first value: index.
 	result := self endpoint graphIndexCreateWith: index on: self graphName.
 	self assertIndexCreated: result
 ]

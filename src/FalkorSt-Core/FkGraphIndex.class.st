@@ -34,6 +34,31 @@ Class {
 	#package : 'FalkorSt-Core'
 }
 
+{ #category : 'constants' }
+FkGraphIndex class >> fulltextType [
+	^ #fulltext
+]
+
+{ #category : 'constants' }
+FkGraphIndex class >> nodeType [
+	^ #node
+]
+
+{ #category : 'constants' }
+FkGraphIndex class >> rangeType [
+	^ #range
+]
+
+{ #category : 'constants' }
+FkGraphIndex class >> relationshipType [
+	^ #relationship
+]
+
+{ #category : 'constants' }
+FkGraphIndex class >> vectorType [
+	^ #vector
+]
+
 { #category : 'accessing' }
 FkGraphIndex >> dimension [
 	^ dimension
@@ -57,7 +82,7 @@ FkGraphIndex >> entityType [
 
 { #category : 'building' }
 FkGraphIndex >> fulltext [
-	self indexType: 'FULLTEXT'.
+	self indexType: self class fulltextType.
 	^ self
 ]
 
@@ -68,7 +93,7 @@ FkGraphIndex >> indexType [
 
 { #category : 'building' }
 FkGraphIndex >> node: aLabel [
-	self entityType: 'NODE'.
+	self entityType: self class nodeType.
 	self entityName: aLabel.
 	^ self
 ]
@@ -86,13 +111,13 @@ FkGraphIndex >> props: aCollection [
 
 { #category : 'building' }
 FkGraphIndex >> range [
-	self indexType: 'RANGE'.
+	self indexType: self class rangeType.
 	^ self
 ]
 
 { #category : 'building' }
 FkGraphIndex >> relationship: aRelType [
-	self entityType: 'RELATIONSHIP'.
+	self entityType: self class relationshipType.
 	self entityName: aRelType.
 	^ self
 ]
@@ -110,7 +135,7 @@ FkGraphIndex >> similarityFunction: aString [
 
 { #category : 'building' }
 FkGraphIndex >> vector [
-	self indexType: 'VECTOR'.
+	self indexType: self class vectorType.
 	^ self
 ]
 
@@ -130,8 +155,8 @@ FkGraphIndex >> createCypher [
 
 { #category : 'private' }
 FkGraphIndex >> createIndexPrefix [
-	self indexType = 'RANGE' ifTrue: [ ^ 'CREATE INDEX FOR ' ].
-	^ 'CREATE ' , self indexType , ' INDEX FOR '
+	self indexType = self class rangeType ifTrue: [ ^ 'CREATE INDEX FOR ' ].
+	^ 'CREATE ' , self indexType asString asUppercase , ' INDEX FOR '
 ]
 
 { #category : 'private' }
@@ -143,7 +168,7 @@ FkGraphIndex >> entityName: aString [
 FkGraphIndex >> entityPattern [
 	| quotedName |
 	quotedName := self quotedName: self entityName.
-	self entityType = 'NODE' ifTrue: [ ^ '(e:' , quotedName , ')' ].
+	self entityType = self class nodeType ifTrue: [ ^ '(e:' , quotedName , ')' ].
 	^ '()-[e:' , quotedName , ']->()'
 ]
 
@@ -160,13 +185,13 @@ FkGraphIndex >> indexType: aString [
 { #category : 'private' }
 FkGraphIndex >> optionsClause [
 	| parts |
-	self indexType = 'VECTOR' ifFalse: [ ^ nil ].
+	self indexType = self class vectorType ifFalse: [ ^ nil ].
 	parts := OrderedCollection new.
 	self dimension ifNotNil: [ :dim | parts add: 'dimension: ' , dim printString ].
 	self similarityFunction ifNotNil: [ :fn |
 		parts add: 'similarityFunction: ' , (self quotedString: fn) ].
 	parts ifEmpty: [ ^ nil ].
-	^ 'OPTIONS {' , (', ' join: parts) , '}'
+	^ 'OPTIONS {' , (parts joinUsing: ', ') , '}'
 ]
 
 { #category : 'private' }
