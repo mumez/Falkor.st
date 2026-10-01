@@ -6,8 +6,8 @@ on. FkGraphEndpoint supplies that when it runs the Cypher from #createCypher.
 
 Responsibility:
 - Hold the index kind, entity, properties, and optional vector options
-- Render CREATE INDEX Cypher whose label and property names are backtick-quoted, so a name cannot
-  break out of the identifier
+- Render CREATE INDEX Cypher, and DROP INDEX Cypher for a single property, with label and property
+  names backtick-quoted so a name cannot break out of the identifier
 
 Collaborators:
 - FkGraphEndpoint: builds or receives me, then sends #createCypher through GRAPH.QUERY
@@ -17,7 +17,8 @@ Public API and Key Messages:
 - #node: / #relationship: - set the entity
 - #props: - set the property names
 - #dimension: / #similarityFunction: - vector OPTIONS
-- #createCypher / #dropCypher - the CREATE INDEX and DROP INDEX statements
+- #createCypher - the CREATE INDEX statement
+- #dropCypherForProperty: - the DROP INDEX statement for one property. FalkorDB removes one property per DROP, so a multi-property spec is dropped by calling this once per property
 "
 Class {
 	#name : 'FkGraphIndex',
@@ -143,38 +144,20 @@ FkGraphIndex >> vector [
 FkGraphIndex >> createCypher [
 	"Answer CREATE INDEX Cypher. Range omits a type keyword. Vector appends OPTIONS when set."
 
-	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: self createIndexPrefix;
-			nextPutAll: self entityPattern;
-			nextPutAll: ' ON (';
-			nextPutAll: self propertyList;
-			nextPut: $).
-		self optionsClause ifNotNil: [ :clause | stream space; nextPutAll: clause ] ]
-]
-
-{ #category : 'cypher' }
-FkGraphIndex >> dropCypher [
-	"Answer DROP INDEX Cypher for every property. Range omits a type keyword. DROP carries no OPTIONS clause."
-
-	^ self dropCypherForProperties: self properties
+	^ self
+		statementForVerb: 'CREATE'
+		properties: self properties
+		options: self optionsClause
 ]
 
 { #category : 'cypher' }
 FkGraphIndex >> dropCypherForProperty: aPropertyName [
 	"Answer DROP INDEX Cypher for one property. FalkorDB removes one property per DROP statement."
 
-	^ self dropCypherForProperties: { aPropertyName }
-]
-
-{ #category : 'private' }
-FkGraphIndex >> createIndexPrefix [
-	^ self statementPrefixFor: 'CREATE'
-]
-
-{ #category : 'private' }
-FkGraphIndex >> dropIndexPrefix [
-	^ self statementPrefixFor: 'DROP'
+	^ self
+		statementForVerb: 'DROP'
+		properties: { aPropertyName }
+		options: nil
 ]
 
 { #category : 'private' }
@@ -218,22 +201,6 @@ FkGraphIndex >> properties: aCollection [
 ]
 
 { #category : 'private' }
-FkGraphIndex >> dropCypherForProperties: aCollection [
-	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: self dropIndexPrefix;
-			nextPutAll: self entityPattern;
-			nextPutAll: ' ON (';
-			nextPutAll: (self propertyListFor: aCollection);
-			nextPut: $) ]
-]
-
-{ #category : 'private' }
-FkGraphIndex >> propertyList [
-	^ self propertyListFor: self properties
-]
-
-{ #category : 'private' }
 FkGraphIndex >> propertyListFor: aCollection [
 	^ String streamContents: [ :stream |
 		aCollection
@@ -266,6 +233,18 @@ FkGraphIndex >> setDimension: anInteger [
 { #category : 'private' }
 FkGraphIndex >> setSimilarityFunction: aString [
 	similarityFunction := aString
+]
+
+{ #category : 'private' }
+FkGraphIndex >> statementForVerb: aVerb properties: aCollection options: aClauseOrNil [
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: (self statementPrefixFor: aVerb);
+			nextPutAll: self entityPattern;
+			nextPutAll: ' ON (';
+			nextPutAll: (self propertyListFor: aCollection);
+			nextPut: $).
+		aClauseOrNil ifNotNil: [ :clause | stream space; nextPutAll: clause ] ]
 ]
 
 { #category : 'private' }

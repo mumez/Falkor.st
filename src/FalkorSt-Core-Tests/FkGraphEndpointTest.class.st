@@ -550,8 +550,7 @@ FkGraphEndpointTest >> assertListedProperty: aProperty type: aType label: aLabel
 	| info |
 	info := self indexInfoLabeled: aLabel entityType: anEntityType.
 	self assert: info class equals: FkGraphIndexInfo.
-	self assert: ((info types at: aProperty) includes: aType).
-	^ info
+	self assert: ((info types at: aProperty) includes: aType)
 ]
 
 { #category : 'private' }
@@ -616,12 +615,14 @@ FkGraphEndpointTest >> assertCreatedIndexSpecsAreListed [
 
 { #category : 'private' }
 FkGraphEndpointTest >> assertVectorProperty: aProperty label: aLabel entityType: anEntityType similarityFunction: aFunction [
-	| options |
-	options := (self
+	| info options |
+	self
 		assertListedProperty: aProperty
 		type: 'VECTOR'
 		label: aLabel
-		entityType: anEntityType) options at: aProperty.
+		entityType: anEntityType.
+	info := self indexInfoLabeled: aLabel entityType: anEntityType.
+	options := info options at: aProperty.
 	self assert: (options at: 'dimension') equals: 4.
 	self assert: (options at: 'similarityFunction') equals: aFunction
 ]

@@ -19,11 +19,11 @@ FkGraphIndexTest >> cypherBuiltBy: aBlock [
 ]
 
 { #category : 'private' }
-FkGraphIndexTest >> dropCypherBuiltBy: aBlock [
+FkGraphIndexTest >> dropCypherForProperty: aPropertyName builtBy: aBlock [
 	| index |
 	index := FkGraphIndex new.
 	aBlock value: index.
-	^ index dropCypher
+	^ index dropCypherForProperty: aPropertyName
 ]
 
 { #category : 'tests' }
@@ -123,30 +123,22 @@ FkGraphIndexTest >> testCreateCypherQuotesSimilarityFunctionString [
 ]
 
 { #category : 'tests' }
-FkGraphIndexTest >> testDropCypherForOneFulltextProperty [
-	| cypher |
-	cypher := (FkGraphIndex new
-		fulltext;
-		node: 'Person';
-		props: #('name' 'bio');
-		yourself) dropCypherForProperty: 'bio'.
-	self assert: cypher equals: 'DROP FULLTEXT INDEX FOR (e:`Person`) ON (e.`bio`)'
-]
-
-{ #category : 'tests' }
-FkGraphIndexTest >> testDropCypherForNodeFulltextIndex [
-	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
-		index fulltext; node: 'Person'; props: #('name' 'bio') ].
+FkGraphIndexTest >> testDropCypherForNodeFulltextIndexIsOnePropertyPerStatement [
+	| index |
+	index := FkGraphIndex new.
+	index fulltext; node: 'Person'; props: #('name' 'bio').
 	self
-		assert: cypher
-		equals: 'DROP FULLTEXT INDEX FOR (e:`Person`) ON (e.`name`, e.`bio`)'
+		assert: (index dropCypherForProperty: 'name')
+		equals: 'DROP FULLTEXT INDEX FOR (e:`Person`) ON (e.`name`)'.
+	self
+		assert: (index dropCypherForProperty: 'bio')
+		equals: 'DROP FULLTEXT INDEX FOR (e:`Person`) ON (e.`bio`)'
 ]
 
 { #category : 'tests' }
 FkGraphIndexTest >> testDropCypherForNodeRangeIndex [
 	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
+	cypher := self dropCypherForProperty: 'email' builtBy: [ :index |
 		index range; node: 'Person'; props: #('email') ].
 	self assert: cypher equals: 'DROP INDEX FOR (e:`Person`) ON (e.`email`)'
 ]
@@ -154,7 +146,7 @@ FkGraphIndexTest >> testDropCypherForNodeRangeIndex [
 { #category : 'tests' }
 FkGraphIndexTest >> testDropCypherForNodeVectorIndexOmitsOptions [
 	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
+	cypher := self dropCypherForProperty: 'embedding' builtBy: [ :index |
 		index
 			vector;
 			node: 'Doc';
@@ -167,7 +159,7 @@ FkGraphIndexTest >> testDropCypherForNodeVectorIndexOmitsOptions [
 { #category : 'tests' }
 FkGraphIndexTest >> testDropCypherForRelationshipFulltextIndex [
 	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
+	cypher := self dropCypherForProperty: 'note' builtBy: [ :index |
 		index fulltext; relationship: 'KNOWS'; props: #('note') ].
 	self
 		assert: cypher
@@ -177,7 +169,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipFulltextIndex [
 { #category : 'tests' }
 FkGraphIndexTest >> testDropCypherForRelationshipRangeIndex [
 	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
+	cypher := self dropCypherForProperty: 'since' builtBy: [ :index |
 		index range; relationship: 'KNOWS'; props: #('since') ].
 	self
 		assert: cypher
@@ -187,7 +179,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipRangeIndex [
 { #category : 'tests' }
 FkGraphIndexTest >> testDropCypherForRelationshipVectorIndexOmitsOptions [
 	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
+	cypher := self dropCypherForProperty: 'embedding' builtBy: [ :index |
 		index
 			vector;
 			relationship: 'SIMILAR';
@@ -202,7 +194,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipVectorIndexOmitsOptions [
 { #category : 'tests' }
 FkGraphIndexTest >> testDropCypherQuotesNamesThatWouldBreakUnquotedCypher [
 	| cypher |
-	cypher := self dropCypherBuiltBy: [ :index |
+	cypher := self dropCypherForProperty: 'email`hack' builtBy: [ :index |
 		index range; node: 'Person) RETURN 1'; props: #('email`hack') ].
 	self
 		assert: cypher
