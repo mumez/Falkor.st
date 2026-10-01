@@ -22,8 +22,8 @@ Coverage:
 - graph-memory spec: reporting per-graph memory usage statistics, decoded into a Dictionary
 - graph-slowlog spec: reporting the graph's slowest queries, decoded into FkSlowLogEntry instances,
   and clearing them via #graphResetLog:
-- graph-index spec: creating range, fulltext, and vector indexes on node labels and relationship
-  types via #graphIndexCreateBy:on: and #graphIndexCreateWith:on:
+- graph-index spec: creating and dropping range, fulltext, and vector indexes on node labels and
+  relationship types, and listing them as FkGraphIndexInfo via #graphIndexes:
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -534,6 +534,27 @@ FkGraphEndpointTest >> assertIndexCreated: result [
 ]
 
 { #category : 'private' }
+FkGraphEndpointTest >> assertIndexDropped: result [
+	self assert: result class equals: FkQueryResult.
+	self assert: (result statistics anySatisfy: [ :line | line includesSubstring: 'Indices deleted' ])
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> indexInfoLabeled: aLabel entityType: anEntityType [
+	^ (self endpoint graphIndexes: self graphName)
+		detect: [ :each | each label = aLabel and: [ each entityType = anEntityType ] ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertListedProperty: aProperty type: aType label: aLabel entityType: anEntityType [
+	| info |
+	info := self indexInfoLabeled: aLabel entityType: anEntityType.
+	self assert: info class equals: FkGraphIndexInfo.
+	self assert: ((info types at: aProperty) includes: aType).
+	^ info
+]
+
+{ #category : 'private' }
 FkGraphEndpointTest >> indexCreateSpecs [
 	^ {
 		[ :index | index range; node: 'Person'; props: #('email') ].
@@ -566,6 +587,74 @@ FkGraphEndpointTest >> testGraphIndexCreateByQuotesLabelThatWouldBreakUnquotedCy
 		graphIndexCreateBy: [ :index | index range; node: 'A)B'; props: #('p') ]
 		on: self graphName.
 	self assertIndexCreated: result
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexesEmptyWhenGraphHasNoIndexes [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertCreatedIndexSpecsAreListed [
+	self assertListedProperty: 'email' type: 'RANGE' label: 'Person' entityType: 'NODE'.
+	self assertListedProperty: 'name' type: 'FULLTEXT' label: 'Person' entityType: 'NODE'.
+	self assertListedProperty: 'bio' type: 'FULLTEXT' label: 'Person' entityType: 'NODE'.
+	self
+		assertVectorProperty: 'embedding'
+		label: 'Doc'
+		entityType: 'NODE'
+		similarityFunction: 'euclidean'.
+	self assertListedProperty: 'since' type: 'RANGE' label: 'KNOWS' entityType: 'RELATIONSHIP'.
+	self assertListedProperty: 'note' type: 'FULLTEXT' label: 'KNOWS' entityType: 'RELATIONSHIP'.
+	self
+		assertVectorProperty: 'embedding'
+		label: 'SIMILAR'
+		entityType: 'RELATIONSHIP'
+		similarityFunction: 'cosine'
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertVectorProperty: aProperty label: aLabel entityType: anEntityType similarityFunction: aFunction [
+	| options |
+	options := (self
+		assertListedProperty: aProperty
+		type: 'VECTOR'
+		label: aLabel
+		entityType: anEntityType) options at: aProperty.
+	self assert: (options at: 'dimension') equals: 4.
+	self assert: (options at: 'similarityFunction') equals: aFunction
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexesListsCreatedIndexesAndDropRemovesThem [
+	self indexCreateSpecs do: [ :spec |
+		self assertIndexCreated: (self endpoint graphIndexCreateBy: spec on: self graphName) ].
+	self assertCreatedIndexSpecsAreListed.
+	self indexCreateSpecs do: [ :spec |
+		self assertIndexDropped: (self endpoint graphIndexDropBy: spec on: self graphName) ].
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexDropWithRemovesIndex [
+	| index |
+	index := FkGraphIndex new.
+	self indexCreateSpecs first value: index.
+	self assertIndexCreated: (self endpoint graphIndexCreateWith: index on: self graphName).
+	self assertListedProperty: 'email' type: 'RANGE' label: 'Person' entityType: 'NODE'.
+	self assertIndexDropped: (self endpoint graphIndexDropWith: index on: self graphName).
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexDropByRemovesQuotedLabel [
+	| spec |
+	spec := [ :index | index range; node: 'A)B'; props: #('p') ].
+	self assertIndexCreated: (self endpoint graphIndexCreateBy: spec on: self graphName).
+	self assertListedProperty: 'p' type: 'RANGE' label: 'A)B' entityType: 'NODE'.
+	self assertIndexDropped: (self endpoint graphIndexDropBy: spec on: self graphName).
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
 ]
 
 { #category : 'tests' }

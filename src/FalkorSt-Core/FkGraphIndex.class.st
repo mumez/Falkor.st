@@ -17,7 +17,7 @@ Public API and Key Messages:
 - #node: / #relationship: - set the entity
 - #props: - set the property names
 - #dimension: / #similarityFunction: - vector OPTIONS
-- #createCypher - the CREATE INDEX statement
+- #createCypher / #dropCypher - the CREATE INDEX and DROP INDEX statements
 "
 Class {
 	#name : 'FkGraphIndex',
@@ -153,10 +153,28 @@ FkGraphIndex >> createCypher [
 		self optionsClause ifNotNil: [ :clause | stream space; nextPutAll: clause ] ]
 ]
 
+{ #category : 'cypher' }
+FkGraphIndex >> dropCypher [
+	"Answer DROP INDEX Cypher for every property. Range omits a type keyword. DROP carries no OPTIONS clause."
+
+	^ self dropCypherForProperties: self properties
+]
+
+{ #category : 'cypher' }
+FkGraphIndex >> dropCypherForProperty: aPropertyName [
+	"Answer DROP INDEX Cypher for one property. FalkorDB removes one property per DROP statement."
+
+	^ self dropCypherForProperties: { aPropertyName }
+]
+
 { #category : 'private' }
 FkGraphIndex >> createIndexPrefix [
-	self indexType = self class rangeType ifTrue: [ ^ 'CREATE INDEX FOR ' ].
-	^ 'CREATE ' , self indexType asString asUppercase , ' INDEX FOR '
+	^ self statementPrefixFor: 'CREATE'
+]
+
+{ #category : 'private' }
+FkGraphIndex >> dropIndexPrefix [
+	^ self statementPrefixFor: 'DROP'
 ]
 
 { #category : 'private' }
@@ -200,9 +218,25 @@ FkGraphIndex >> properties: aCollection [
 ]
 
 { #category : 'private' }
-FkGraphIndex >> propertyList [
+FkGraphIndex >> dropCypherForProperties: aCollection [
 	^ String streamContents: [ :stream |
-		self properties
+		stream
+			nextPutAll: self dropIndexPrefix;
+			nextPutAll: self entityPattern;
+			nextPutAll: ' ON (';
+			nextPutAll: (self propertyListFor: aCollection);
+			nextPut: $) ]
+]
+
+{ #category : 'private' }
+FkGraphIndex >> propertyList [
+	^ self propertyListFor: self properties
+]
+
+{ #category : 'private' }
+FkGraphIndex >> propertyListFor: aCollection [
+	^ String streamContents: [ :stream |
+		aCollection
 			do: [ :each |
 				stream
 					nextPutAll: 'e.';
@@ -232,4 +266,10 @@ FkGraphIndex >> setDimension: anInteger [
 { #category : 'private' }
 FkGraphIndex >> setSimilarityFunction: aString [
 	similarityFunction := aString
+]
+
+{ #category : 'private' }
+FkGraphIndex >> statementPrefixFor: aVerb [
+	self indexType = self class rangeType ifTrue: [ ^ aVerb , ' INDEX FOR ' ].
+	^ aVerb , ' ' , self indexType asString asUppercase , ' INDEX FOR '
 ]

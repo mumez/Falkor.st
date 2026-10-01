@@ -40,7 +40,10 @@ Collaborators:
   #graphConstraintDropBy:on: object-based API, built by the caller or evaluated against a caller's
   block
 - FkGraphIndex: collects an index's kind/entity/properties and optional vector options for the
-  #graphIndexCreateWith:on: / #graphIndexCreateBy:on: object-based API
+  #graphIndexCreateWith:on: / #graphIndexCreateBy:on: and #graphIndexDropWith:on: /
+  #graphIndexDropBy:on: object-based API
+- FkGraphIndexInfo: the decoded value object I build one per CALL db.indexes() record in
+  #graphIndexes:
 - FkSlowLogEntry: the decoded value object I build one per raw GRAPH.SLOWLOG entry in #graphSlowLog:
 
 Public API and Key Messages:
@@ -81,6 +84,10 @@ Public API and Key Messages:
   running its CREATE INDEX Cypher via GRAPH.QUERY, answering an FkQueryResult
 - #graphIndexCreateBy:on: - like #graphIndexCreateWith:on: but builds the FkGraphIndex by
   evaluating the caller's block, e.g. [ :i | i range; node: 'Person'; props: #('email') ]
+- #graphIndexDropWith:on: / #graphIndexDropBy:on: - drop the index described by an FkGraphIndex,
+  running its DROP INDEX Cypher via GRAPH.QUERY
+- #graphIndexes: - list a graph's indexes via CALL db.indexes(), answering an OrderedCollection
+  of FkGraphIndexInfo
 - #graphExplain:cypher: - construct a query execution plan without running it, answering the raw
   plan reply
 - #graphExplain:cypher:params: - like #graphExplain:cypher: with named parameters bound via the
@@ -314,6 +321,30 @@ FkGraphEndpoint >> graphIndexCreateBy: aBlock on: graphName [
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphIndexCreateWith: aFkGraphIndex on: graphName [
 	^ self graphQuery: graphName cypher: aFkGraphIndex createCypher
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphIndexDropBy: aBlock on: graphName [
+	| index |
+	index := FkGraphIndex new.
+	aBlock value: index.
+	^ self graphIndexDropWith: index on: graphName
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphIndexDropWith: aFkGraphIndex on: graphName [
+	"FalkorDB applies each DROP INDEX to one property, so a multi-property spec is dropped one property at a time. The last reply is answered."
+
+	| result |
+	aFkGraphIndex properties do: [ :each |
+		result := self graphQuery: graphName cypher: (aFkGraphIndex dropCypherForProperty: each) ].
+	^ result
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphIndexes: graphName [
+	^ (self graphQuery: graphName cypher: 'CALL db.indexes()') mappedRecords collect: [ :record |
+		FkGraphIndexInfo fromRecord: record ]
 ]
 
 { #category : 'commands-graph' }
