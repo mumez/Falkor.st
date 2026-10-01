@@ -7,12 +7,15 @@ to FalkorDB myself.
 Responsibility:
 - Hold the label, properties, per-property kinds and options, language, stopwords, entity type,
   and status from one db.indexes() record
+- Keep the raw mapped record I was built from, so a missing or renamed key is still inspectable
+  rather than silently lost behind a nil accessor
 
 Collaborators:
 - FkGraphEndpoint: builds instances of me from mapped db.indexes() records
 
 Public API and Key Messages:
 - #label / #properties / #types / #options / #language / #stopwords / #entityType / #status
+- #rawIndexInfo - the raw mapped db.indexes() record I was built from
 - FkGraphIndexInfo class >> fromRecord: - build one instance from a mapped record
 "
 Class {
@@ -26,7 +29,8 @@ Class {
 		'language',
 		'stopwords',
 		'entityType',
-		'status'
+		'status',
+		'rawIndexInfo'
 	],
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
@@ -35,14 +39,15 @@ Class {
 { #category : 'instance creation' }
 FkGraphIndexInfo class >> fromRecord: aDictionary [
 	^ self new
-		label: (aDictionary at: 'label');
-		properties: (aDictionary at: 'properties');
-		types: (aDictionary at: 'types');
-		options: (aDictionary at: 'options');
-		language: (aDictionary at: 'language');
-		stopwords: (aDictionary at: 'stopwords');
-		entityType: (aDictionary at: 'entitytype');
-		status: (aDictionary at: 'status');
+		rawIndexInfo: aDictionary;
+		label: (aDictionary at: 'label' ifAbsent: []);
+		properties: (aDictionary at: 'properties' ifAbsent: []);
+		types: (aDictionary at: 'types' ifAbsent: []);
+		options: (aDictionary at: 'options' ifAbsent: []);
+		language: (aDictionary at: 'language' ifAbsent: []);
+		stopwords: (aDictionary at: 'stopwords' ifAbsent: []);
+		entityType: (aDictionary at: 'entitytype' ifAbsent: []);
+		status: (aDictionary at: 'status' ifAbsent: []);
 		yourself
 ]
 
@@ -69,6 +74,11 @@ FkGraphIndexInfo >> options [
 { #category : 'accessing' }
 FkGraphIndexInfo >> properties [
 	^ properties
+]
+
+{ #category : 'accessing' }
+FkGraphIndexInfo >> rawIndexInfo [
+	^ rawIndexInfo
 ]
 
 { #category : 'accessing' }
@@ -109,6 +119,11 @@ FkGraphIndexInfo >> options: anObject [
 { #category : 'private' }
 FkGraphIndexInfo >> properties: anObject [
 	properties := anObject
+]
+
+{ #category : 'private' }
+FkGraphIndexInfo >> rawIndexInfo: anObject [
+	rawIndexInfo := anObject
 ]
 
 { #category : 'private' }
