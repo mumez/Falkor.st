@@ -32,7 +32,9 @@ stick close.
 `FkQueryResult`, whose `records` are rows of decoded values (`FkNode`, `FkRelationship`, `FkPath`, or
 native scalars). See `FkGraphEndpoint` for the full command set (`GRAPH.RO_QUERY`, `GRAPH.DELETE`,
 `GRAPH.INFO`, `GRAPH.CONFIG`, `GRAPH.CONSTRAINT CREATE`/`DROP`, `GRAPH.EXPLAIN`, `GRAPH.PROFILE`,
-`GRAPH.LIST`, `GRAPH.COPY`, `GRAPH.MEMORY`, `GRAPH.SLOWLOG`, and more).
+`GRAPH.LIST`, `GRAPH.COPY`, `GRAPH.MEMORY`, `GRAPH.SLOWLOG`, and more). `FalkorSt-Objects` adds
+`graphCallProcedure:procedure:*` for invoking stored procedures (e.g. `db.labels`) with arguments
+safely bound as query parameters.
 
 ## High-Level Object API
 
