@@ -22,6 +22,8 @@ Coverage:
 - graph-memory spec: reporting per-graph memory usage statistics, decoded into a Dictionary
 - graph-slowlog spec: reporting the graph's slowest queries, decoded into FkSlowLogEntry instances,
   and clearing them via #graphResetLog:
+- graph-index spec: creating range, fulltext, and vector indexes on node labels and relationship
+  types via #graphIndexCreateBy:on: and #graphIndexCreateWith:on:
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -523,6 +525,47 @@ FkGraphEndpointTest >> testGraphConstraintDropBySucceeds [
 			on: self graphName.
 		self assert: reply equals: 'OK' ]
 		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertIndexCreated: result [
+	self assert: result class equals: FkQueryResult.
+	self assert: (result statistics anySatisfy: [ :line | line includesSubstring: 'Indices created' ])
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> indexCreateSpecs [
+	^ {
+		[ :index | index range; node: 'Person'; props: #('email') ].
+		[ :index | index fulltext; node: 'Person'; props: #('name' 'bio') ].
+		[ :index | index vector; node: 'Doc'; props: #('embedding'); dimension: 4; similarityFunction: 'euclidean' ].
+		[ :index | index range; relationship: 'KNOWS'; props: #('since') ].
+		[ :index | index fulltext; relationship: 'KNOWS'; props: #('note') ].
+		[ :index | index vector; relationship: 'SIMILAR'; props: #('embedding'); dimension: 4; similarityFunction: 'cosine' ] }
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexCreateBySucceedsForEachKindAndEntity [
+	self indexCreateSpecs do: [ :spec |
+		self assertIndexCreated: (self endpoint graphIndexCreateBy: spec on: self graphName) ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexCreateWithSucceeds [
+	| index result |
+	index := FkGraphIndex new.
+	self indexCreateSpecs first value: index.
+	result := self endpoint graphIndexCreateWith: index on: self graphName.
+	self assertIndexCreated: result
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexCreateByQuotesLabelThatWouldBreakUnquotedCypher [
+	| result |
+	result := self endpoint
+		graphIndexCreateBy: [ :index | index range; node: 'A)B'; props: #('p') ]
+		on: self graphName.
+	self assertIndexCreated: result
 ]
 
 { #category : 'tests' }

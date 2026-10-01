@@ -39,6 +39,8 @@ Collaborators:
   #graphConstraintCreateWith:on: / #graphConstraintCreateBy:on: / #graphConstraintDropWith:on: /
   #graphConstraintDropBy:on: object-based API, built by the caller or evaluated against a caller's
   block
+- FkGraphIndex: collects an index's kind/entity/properties and optional vector options for the
+  #graphIndexCreateWith:on: / #graphIndexCreateBy:on: object-based API
 - FkSlowLogEntry: the decoded value object I build one per raw GRAPH.SLOWLOG entry in #graphSlowLog:
 
 Public API and Key Messages:
@@ -75,6 +77,10 @@ Public API and Key Messages:
   graph, delegating to #graphConstraintDrop:type:entityType:entityName:properties:
 - #graphConstraintDropBy:on: - block-based counterpart of #graphConstraintDropWith:on:, mirroring
   #graphConstraintCreateBy:on:
+- #graphIndexCreateWith:on: - create a range, fulltext, or vector index from an FkGraphIndex by
+  running its CREATE INDEX Cypher via GRAPH.QUERY, answering an FkQueryResult
+- #graphIndexCreateBy:on: - like #graphIndexCreateWith:on: but builds the FkGraphIndex by
+  evaluating the caller's block, e.g. [ :i | i range; node: 'Person'; props: #('email') ]
 - #graphExplain:cypher: - construct a query execution plan without running it, answering the raw
   plan reply
 - #graphExplain:cypher:params: - like #graphExplain:cypher: with named parameters bound via the
@@ -295,6 +301,19 @@ FkGraphEndpoint >> graphInfo: optionsBlock [
 	args := OrderedCollection with: 'GRAPH.INFO'.
 	args addAll: options asArray.
 	^ self unifiedCommand: args
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphIndexCreateBy: aBlock on: graphName [
+	| index |
+	index := FkGraphIndex new.
+	aBlock value: index.
+	^ self graphIndexCreateWith: index on: graphName
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphIndexCreateWith: aFkGraphIndex on: graphName [
+	^ self graphQuery: graphName cypher: aFkGraphIndex createCypher
 ]
 
 { #category : 'commands-graph' }
