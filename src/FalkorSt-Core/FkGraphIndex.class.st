@@ -1,6 +1,6 @@
 "
-I am a fluent builder for a FalkorDB CREATE INDEX statement: the index kind (range, fulltext, or
-vector), the entity it covers (a node label or relationship type), the property names, and, for a
+I am a fluent builder for a FalkorDB CREATE INDEX statement: the index kind (range, fulltext, vector,
+or cch), the entity it covers (a node label or relationship type), the property names, and, for a
 vector index, the dimension and similarity function. I don't know which graph the index is created
 on. FkGraphEndpoint supplies that when it runs the Cypher from #createCypher.
 
@@ -13,9 +13,10 @@ Collaborators:
 - FkGraphEndpoint: builds or receives me, then sends #createCypher through GRAPH.QUERY
 
 Public API and Key Messages:
-- #range / #fulltext / #vector - set the index kind
-- #node: / #relationship: - set the entity
-- #props: - set the property names
+- #range / #fulltext / #vector / #cch - set the index kind
+- #node: / #relationship: - set the entity. A cch index only applies to a relationship type -
+  FalkorDB itself rejects a cch index built against a node label
+- #props: - set the property names. A cch index takes exactly one property, the edge weight
 - #dimension: / #similarityFunction: - vector OPTIONS
 - #createCypher - the CREATE INDEX statement
 - #dropCypherForProperty: - the DROP INDEX statement for one property. FalkorDB removes one property per DROP, so a multi-property spec is dropped by calling this once per property
@@ -35,29 +36,40 @@ Class {
 	#package : 'FalkorSt-Core'
 }
 
-{ #category : 'constants' }
-FkGraphIndex class >> fulltextType [
+{ #category : 'constants-index' }
+FkGraphIndex class >> cchIndexType [
+	^ #cch
+]
+
+{ #category : 'constants-index' }
+FkGraphIndex class >> fulltextIndexType [
 	^ #fulltext
 ]
 
-{ #category : 'constants' }
-FkGraphIndex class >> nodeType [
+{ #category : 'constants-entity' }
+FkGraphIndex class >> nodeEntityType [
 	^ #node
 ]
 
-{ #category : 'constants' }
-FkGraphIndex class >> rangeType [
+{ #category : 'constants-index' }
+FkGraphIndex class >> rangeIndexType [
 	^ #range
 ]
 
-{ #category : 'constants' }
-FkGraphIndex class >> relationshipType [
+{ #category : 'constants-entity' }
+FkGraphIndex class >> relationshipEntityType [
 	^ #relationship
 ]
 
-{ #category : 'constants' }
-FkGraphIndex class >> vectorType [
+{ #category : 'constants-index' }
+FkGraphIndex class >> vectorIndexType [
 	^ #vector
+]
+
+{ #category : 'building' }
+FkGraphIndex >> cch [
+	self indexType: self class cchIndexType.
+	^ self
 ]
 
 { #category : 'accessing' }
@@ -83,7 +95,7 @@ FkGraphIndex >> entityType [
 
 { #category : 'building' }
 FkGraphIndex >> fulltext [
-	self indexType: self class fulltextType.
+	self indexType: self class fulltextIndexType.
 	^ self
 ]
 
@@ -94,7 +106,7 @@ FkGraphIndex >> indexType [
 
 { #category : 'building' }
 FkGraphIndex >> node: aLabel [
-	self entityType: self class nodeType.
+	self entityType: self class nodeEntityType.
 	self entityName: aLabel.
 	^ self
 ]
@@ -112,13 +124,13 @@ FkGraphIndex >> props: aCollection [
 
 { #category : 'building' }
 FkGraphIndex >> range [
-	self indexType: self class rangeType.
+	self indexType: self class rangeIndexType.
 	^ self
 ]
 
 { #category : 'building' }
 FkGraphIndex >> relationship: aRelType [
-	self entityType: self class relationshipType.
+	self entityType: self class relationshipEntityType.
 	self entityName: aRelType.
 	^ self
 ]
@@ -136,7 +148,7 @@ FkGraphIndex >> similarityFunction: aString [
 
 { #category : 'building' }
 FkGraphIndex >> vector [
-	self indexType: self class vectorType.
+	self indexType: self class vectorIndexType.
 	^ self
 ]
 
@@ -169,7 +181,7 @@ FkGraphIndex >> entityName: aString [
 FkGraphIndex >> entityPattern [
 	| quotedName |
 	quotedName := self quotedName: self entityName.
-	self entityType = self class nodeType ifTrue: [ ^ '(e:' , quotedName , ')' ].
+	self entityType = self class nodeEntityType ifTrue: [ ^ '(e:' , quotedName , ')' ].
 	^ '()-[e:' , quotedName , ']->()'
 ]
 
@@ -186,7 +198,7 @@ FkGraphIndex >> indexType: aString [
 { #category : 'private' }
 FkGraphIndex >> optionsClause [
 	| parts |
-	self indexType = self class vectorType ifFalse: [ ^ nil ].
+	self indexType = self class vectorIndexType ifFalse: [ ^ nil ].
 	parts := OrderedCollection new.
 	self dimension ifNotNil: [ :dim | parts add: 'dimension: ' , dim printString ].
 	self similarityFunction ifNotNil: [ :fn |
@@ -249,6 +261,6 @@ FkGraphIndex >> statementForVerb: aVerb properties: aCollection options: aClause
 
 { #category : 'private' }
 FkGraphIndex >> statementPrefixFor: aVerb [
-	self indexType = self class rangeType ifTrue: [ ^ aVerb , ' INDEX FOR ' ].
+	self indexType = self class rangeIndexType ifTrue: [ ^ aVerb , ' INDEX FOR ' ].
 	^ aVerb , ' ' , self indexType asString asUppercase , ' INDEX FOR '
 ]

@@ -1,7 +1,8 @@
 "
 I test the CREATE INDEX and DROP INDEX Cypher that FkGraphIndex renders, without a FalkorDB
-connection. Each index kind is covered for both a node label and a relationship type, including
-vector OPTIONS on create, their absence on drop, and backtick quoting of names.
+connection. Each index kind is covered for both a node label and a relationship type (cch is
+relationship-only), including vector OPTIONS on create, their absence on drop, and backtick quoting
+of names.
 "
 Class {
 	#name : 'FkGraphIndexTest',
@@ -57,6 +58,16 @@ FkGraphIndexTest >> testCreateCypherForNodeVectorIndexIncludesOptions [
 	self
 		assert: cypher
 		equals: 'CREATE VECTOR INDEX FOR (e:`Doc`) ON (e.`embedding`) OPTIONS {dimension: 128, similarityFunction: ''euclidean''}'
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testCreateCypherForRelationshipCchIndex [
+	| cypher |
+	cypher := self cypherBuiltBy: [ :index |
+		index cch; relationship: 'ROAD'; props: #('distance') ].
+	self
+		assert: cypher
+		equals: 'CREATE CCH INDEX FOR ()-[e:`ROAD`]->() ON (e.`distance`)'
 ]
 
 { #category : 'tests' }
@@ -154,6 +165,16 @@ FkGraphIndexTest >> testDropCypherForNodeVectorIndexOmitsOptions [
 			dimension: 128;
 			similarityFunction: 'euclidean' ].
 	self assert: cypher equals: 'DROP VECTOR INDEX FOR (e:`Doc`) ON (e.`embedding`)'
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testDropCypherForRelationshipCchIndex [
+	| cypher |
+	cypher := self dropCypherForProperty: 'distance' builtBy: [ :index |
+		index cch; relationship: 'ROAD'; props: #('distance') ].
+	self
+		assert: cypher
+		equals: 'DROP CCH INDEX FOR ()-[e:`ROAD`]->() ON (e.`distance`)'
 ]
 
 { #category : 'tests' }
