@@ -93,9 +93,8 @@ FkGraphEndpointProcedureCallTest >> createFulltextIndexedPersonNamed: aName [
 	"Create a fulltext-indexed :Person node with the given name, and answer that name."
 
 	self endpoint
-		graphQuery: self graphName
-		cypher: 'CALL db.idx.fulltext.createNodeIndex($label, $prop)'
-		params: { 'label' -> 'Person'. 'prop' -> 'name' } asDictionary.
+		graphIndexCreateBy: [ :index | index fulltext; node: 'Person'; props: #('name') ]
+		on: self graphName.
 	self endpoint
 		graphQuery: self graphName
 		cypher: 'CREATE (:Person {name: $n})'

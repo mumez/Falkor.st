@@ -407,14 +407,14 @@ FkGraphEndpointTest >> testGraphMemoryUsageWithSamplesAnswersDictionaryWithData 
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphSlowLogAnswersEntriesForSlowQuery [
 	| reply entry |
-	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
 	reply := self endpoint graphSlowLog: self graphName.
 	self assert: reply class equals: OrderedCollection.
 	self deny: reply isEmpty.
 	entry := reply first.
 	self assert: entry class equals: FkSlowLogEntry.
 	self assert: entry command equals: 'GRAPH.QUERY'.
-	self assert: entry query equals: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self assert: entry query equals: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
 	self assert: entry executionTimeMs > 0.
 	self assert: entry timestamp notNil.
 	self assert: entry parameters isNil
@@ -426,12 +426,12 @@ FkGraphEndpointTest >> testGraphSlowLogDecodesParametersWhenQueryWasBoundWithThe
 	self endpoint
 		graphQuery: self graphName
 		cypher: 'UNWIND range(1, $n) AS x RETURN sum(x)'
-		params: (Dictionary new at: 'n' put: 200000; yourself).
+		params: (Dictionary new at: 'n' put: 2000000; yourself).
 	reply := self endpoint graphSlowLog: self graphName.
 	self deny: reply isEmpty.
 	entry := reply first.
 	self assert: entry parameters notNil.
-	self assert: (entry parameters includesSubstring: 'n=200000')
+	self assert: (entry parameters includesSubstring: 'n=2000000')
 ]
 
 { #category : 'tests' }
@@ -446,7 +446,7 @@ FkGraphEndpointTest >> testGraphSlowLogAnswersEmptyForGraphWithoutSlowQueries [
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphResetLogClearsEntries [
 	| resetReply reply |
-	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
 	self deny: (self endpoint graphSlowLog: self graphName) isEmpty.
 	resetReply := self endpoint graphResetLog: self graphName.
 	self assert: resetReply equals: 'OK'.
