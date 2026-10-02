@@ -5,8 +5,8 @@ covering both the Cypher/params it generates and its execution against a real Fa
 Class {
 	#name : 'FkGraphEndpointProcedureCallTest',
 	#superclass : 'FkGraphEndpointTestCase',
-	#category : 'FalkorSt-Objects-Tests',
-	#package : 'FalkorSt-Objects-Tests'
+	#category : 'FalkorSt-Core-Tests',
+	#package : 'FalkorSt-Core-Tests'
 }
 
 { #category : 'tests' }

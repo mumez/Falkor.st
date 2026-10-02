@@ -13,7 +13,7 @@ BaselineOfFalkorSt >> baseline: spec [
 		self rediStick: spec.
 		self sCypher: spec.
 		spec
-			package: 'FalkorSt-Core' with: [ spec requires: #('RediStick') ].
+			package: 'FalkorSt-Core' with: [ spec requires: #('RediStick' 'SCypher') ].
 		spec
 			package: 'FalkorSt-Core-Tests' with: [ spec requires: #('FalkorSt-Core') ].
 		spec
