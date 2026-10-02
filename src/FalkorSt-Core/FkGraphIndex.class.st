@@ -175,13 +175,10 @@ FkGraphIndex >> dropCypherForProperty: aPropertyName [
 
 { #category : 'private' }
 FkGraphIndex >> applyIndexTypeTo: aCyIndexCommand [
-	"Range has no type keyword. Fulltext uses the specifier's dedicated shortcut; vector and cch
-	are set as arbitrary type keywords SCypher has no shortcut for."
+	"Range has no type keyword; every other kind uses its uppercased name (FULLTEXT, VECTOR, CCH)."
 
-	self indexType = self class rangeIndexType ifTrue: [ ^ self ].
-	self indexType = self class fulltextIndexType
-		ifTrue: [ ^ aCyIndexCommand spec: [ :specifier | specifier fullText ] ].
-	aCyIndexCommand spec: [ :specifier | specifier type: self indexType asString asUppercase ]
+	self indexType = self class rangeIndexType ifFalse: [
+		aCyIndexCommand spec: [ :specifier | specifier type: self indexType asString asUppercase ] ]
 ]
 
 { #category : 'private' }

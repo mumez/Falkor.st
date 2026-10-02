@@ -17,7 +17,7 @@ BaselineOfFalkorSt >> baseline: spec [
 		spec
 			package: 'FalkorSt-Core-Tests' with: [ spec requires: #('FalkorSt-Core') ].
 		spec
-			package: 'FalkorSt-Objects' with: [ spec requires: #('FalkorSt-Core') ].
+			package: 'FalkorSt-Objects' with: [ spec requires: #('FalkorSt-Core' 'SCypher') ].
 		spec
 			package: 'FalkorSt-Objects-Tests' with: [ spec requires: #('FalkorSt-Core-Tests' 'FalkorSt-Objects') ].
 
