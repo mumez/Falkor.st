@@ -1,8 +1,8 @@
 "
 I test the CREATE INDEX and DROP INDEX Cypher that FkGraphIndex renders, without a FalkorDB
 connection. Each index kind is covered for both a node label and a relationship type (cch is
-relationship-only), including vector OPTIONS on create, their absence on drop, and backtick quoting
-of names.
+relationship-only), including vector OPTIONS on create, their absence on drop, and SCypher's
+backtick quoting of names that would otherwise break the Cypher syntax.
 "
 Class {
 	#name : 'FkGraphIndexTest',
@@ -34,7 +34,7 @@ FkGraphIndexTest >> testCreateCypherForNodeFulltextIndex [
 		index fulltext; node: 'Person'; props: #('name' 'bio') ].
 	self
 		assert: cypher
-		equals: 'CREATE FULLTEXT INDEX FOR (e:`Person`) ON (e.`name`, e.`bio`)'
+		equals: 'CREATE FULLTEXT INDEX FOR (n:Person) ON (n.name, n.bio)'
 ]
 
 { #category : 'tests' }
@@ -42,7 +42,7 @@ FkGraphIndexTest >> testCreateCypherForNodeRangeIndex [
 	| cypher |
 	cypher := self cypherBuiltBy: [ :index |
 		index range; node: 'Person'; props: #('email') ].
-	self assert: cypher equals: 'CREATE INDEX FOR (e:`Person`) ON (e.`email`)'
+	self assert: cypher equals: 'CREATE INDEX FOR (n:Person) ON (n.email)'
 ]
 
 { #category : 'tests' }
@@ -57,7 +57,7 @@ FkGraphIndexTest >> testCreateCypherForNodeVectorIndexIncludesOptions [
 			similarityFunction: 'euclidean' ].
 	self
 		assert: cypher
-		equals: 'CREATE VECTOR INDEX FOR (e:`Doc`) ON (e.`embedding`) OPTIONS {dimension: 128, similarityFunction: ''euclidean''}'
+		equals: 'CREATE VECTOR INDEX FOR (n:Doc) ON (n.embedding) OPTIONS {dimension: 128, similarityFunction: ''euclidean''}'
 ]
 
 { #category : 'tests' }
@@ -67,7 +67,7 @@ FkGraphIndexTest >> testCreateCypherForRelationshipCchIndex [
 		index cch; relationship: 'ROAD'; props: #('distance') ].
 	self
 		assert: cypher
-		equals: 'CREATE CCH INDEX FOR ()-[e:`ROAD`]->() ON (e.`distance`)'
+		equals: 'CREATE CCH INDEX FOR ()-[r:ROAD]-() ON (r.distance)'
 ]
 
 { #category : 'tests' }
@@ -77,7 +77,7 @@ FkGraphIndexTest >> testCreateCypherForRelationshipFulltextIndex [
 		index fulltext; relationship: 'KNOWS'; props: #('note') ].
 	self
 		assert: cypher
-		equals: 'CREATE FULLTEXT INDEX FOR ()-[e:`KNOWS`]->() ON (e.`note`)'
+		equals: 'CREATE FULLTEXT INDEX FOR ()-[r:KNOWS]-() ON (r.note)'
 ]
 
 { #category : 'tests' }
@@ -87,7 +87,7 @@ FkGraphIndexTest >> testCreateCypherForRelationshipRangeIndex [
 		index range; relationship: 'KNOWS'; props: #('since') ].
 	self
 		assert: cypher
-		equals: 'CREATE INDEX FOR ()-[e:`KNOWS`]->() ON (e.`since`)'
+		equals: 'CREATE INDEX FOR ()-[r:KNOWS]-() ON (r.since)'
 ]
 
 { #category : 'tests' }
@@ -102,7 +102,7 @@ FkGraphIndexTest >> testCreateCypherForRelationshipVectorIndexIncludesOptions [
 			similarityFunction: 'cosine' ].
 	self
 		assert: cypher
-		equals: 'CREATE VECTOR INDEX FOR ()-[e:`SIMILAR`]->() ON (e.`embedding`) OPTIONS {dimension: 3, similarityFunction: ''cosine''}'
+		equals: 'CREATE VECTOR INDEX FOR ()-[r:SIMILAR]-() ON (r.embedding) OPTIONS {dimension: 3, similarityFunction: ''cosine''}'
 ]
 
 { #category : 'tests' }
@@ -115,7 +115,7 @@ FkGraphIndexTest >> testCreateCypherQuotesNamesThatWouldBreakUnquotedCypher [
 			props: #('email`hack') ].
 	self
 		assert: cypher
-		equals: 'CREATE INDEX FOR (e:`Person) RETURN 1`) ON (e.`email``hack`)'
+		equals: 'CREATE INDEX FOR (n:`Person) RETURN 1`) ON (n.`email``hack`)'
 ]
 
 { #category : 'tests' }
@@ -130,7 +130,7 @@ FkGraphIndexTest >> testCreateCypherQuotesSimilarityFunctionString [
 			similarityFunction: 'eucl''idean' ].
 	self
 		assert: cypher
-		equals: 'CREATE VECTOR INDEX FOR (e:`Doc`) ON (e.`embedding`) OPTIONS {dimension: 2, similarityFunction: ''eucl''''idean''}'
+		equals: 'CREATE VECTOR INDEX FOR (n:Doc) ON (n.embedding) OPTIONS {dimension: 2, similarityFunction: ''eucl''''idean''}'
 ]
 
 { #category : 'tests' }
@@ -140,10 +140,10 @@ FkGraphIndexTest >> testDropCypherForNodeFulltextIndexIsOnePropertyPerStatement 
 	index fulltext; node: 'Person'; props: #('name' 'bio').
 	self
 		assert: (index dropCypherForProperty: 'name')
-		equals: 'DROP FULLTEXT INDEX FOR (e:`Person`) ON (e.`name`)'.
+		equals: 'DROP FULLTEXT INDEX FOR (n:Person) ON (n.name)'.
 	self
 		assert: (index dropCypherForProperty: 'bio')
-		equals: 'DROP FULLTEXT INDEX FOR (e:`Person`) ON (e.`bio`)'
+		equals: 'DROP FULLTEXT INDEX FOR (n:Person) ON (n.bio)'
 ]
 
 { #category : 'tests' }
@@ -151,7 +151,7 @@ FkGraphIndexTest >> testDropCypherForNodeRangeIndex [
 	| cypher |
 	cypher := self dropCypherForProperty: 'email' builtBy: [ :index |
 		index range; node: 'Person'; props: #('email') ].
-	self assert: cypher equals: 'DROP INDEX FOR (e:`Person`) ON (e.`email`)'
+	self assert: cypher equals: 'DROP INDEX FOR (n:Person) ON (n.email)'
 ]
 
 { #category : 'tests' }
@@ -164,7 +164,7 @@ FkGraphIndexTest >> testDropCypherForNodeVectorIndexOmitsOptions [
 			props: #('embedding');
 			dimension: 128;
 			similarityFunction: 'euclidean' ].
-	self assert: cypher equals: 'DROP VECTOR INDEX FOR (e:`Doc`) ON (e.`embedding`)'
+	self assert: cypher equals: 'DROP VECTOR INDEX FOR (n:Doc) ON (n.embedding)'
 ]
 
 { #category : 'tests' }
@@ -174,7 +174,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipCchIndex [
 		index cch; relationship: 'ROAD'; props: #('distance') ].
 	self
 		assert: cypher
-		equals: 'DROP CCH INDEX FOR ()-[e:`ROAD`]->() ON (e.`distance`)'
+		equals: 'DROP CCH INDEX FOR ()-[r:ROAD]-() ON (r.distance)'
 ]
 
 { #category : 'tests' }
@@ -184,7 +184,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipFulltextIndex [
 		index fulltext; relationship: 'KNOWS'; props: #('note') ].
 	self
 		assert: cypher
-		equals: 'DROP FULLTEXT INDEX FOR ()-[e:`KNOWS`]->() ON (e.`note`)'
+		equals: 'DROP FULLTEXT INDEX FOR ()-[r:KNOWS]-() ON (r.note)'
 ]
 
 { #category : 'tests' }
@@ -194,7 +194,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipRangeIndex [
 		index range; relationship: 'KNOWS'; props: #('since') ].
 	self
 		assert: cypher
-		equals: 'DROP INDEX FOR ()-[e:`KNOWS`]->() ON (e.`since`)'
+		equals: 'DROP INDEX FOR ()-[r:KNOWS]-() ON (r.since)'
 ]
 
 { #category : 'tests' }
@@ -209,7 +209,7 @@ FkGraphIndexTest >> testDropCypherForRelationshipVectorIndexOmitsOptions [
 			similarityFunction: 'cosine' ].
 	self
 		assert: cypher
-		equals: 'DROP VECTOR INDEX FOR ()-[e:`SIMILAR`]->() ON (e.`embedding`)'
+		equals: 'DROP VECTOR INDEX FOR ()-[r:SIMILAR]-() ON (r.embedding)'
 ]
 
 { #category : 'tests' }
@@ -219,5 +219,5 @@ FkGraphIndexTest >> testDropCypherQuotesNamesThatWouldBreakUnquotedCypher [
 		index range; node: 'Person) RETURN 1'; props: #('email`hack') ].
 	self
 		assert: cypher
-		equals: 'DROP INDEX FOR (e:`Person) RETURN 1`) ON (e.`email``hack`)'
+		equals: 'DROP INDEX FOR (n:`Person) RETURN 1`) ON (n.`email``hack`)'
 ]

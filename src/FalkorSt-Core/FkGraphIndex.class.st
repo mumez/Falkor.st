@@ -6,11 +6,13 @@ on. FkGraphEndpoint supplies that when it runs the Cypher from #createCypher.
 
 Responsibility:
 - Hold the index kind, entity, properties, and optional vector options
-- Render CREATE INDEX Cypher, and DROP INDEX Cypher for a single property, with label and property
-  names backtick-quoted so a name cannot break out of the identifier
+- Render CREATE INDEX Cypher, and DROP INDEX Cypher for a single property, via SCypher - entity and
+  property names come out backtick-quoted because SCypher quotes identifiers itself
 
 Collaborators:
 - FkGraphEndpoint: builds or receives me, then sends #createCypher through GRAPH.QUERY
+- SCypher's CyCreateIndex/CyDropIndex: assemble and render the Cypher statement itself; vector OPTIONS
+  have no SCypher equivalent, so FkGraphIndex appends that clause itself
 
 Public API and Key Messages:
 - #range / #fulltext / #vector / #cch - set the index kind
@@ -156,20 +158,54 @@ FkGraphIndex >> vector [
 FkGraphIndex >> createCypher [
 	"Answer CREATE INDEX Cypher. Range omits a type keyword. Vector appends OPTIONS when set."
 
-	^ self
-		statementForVerb: 'CREATE'
-		properties: self properties
-		options: self optionsClause
+	| cypher |
+	cypher := (self cyCommand: CyCreateIndex forProperties: self properties)
+		cypherString trimRight.
+	self optionsClause ifNotNil: [ :clause | cypher := cypher , ' ' , clause ].
+	^ cypher
 ]
 
 { #category : 'cypher' }
 FkGraphIndex >> dropCypherForProperty: aPropertyName [
 	"Answer DROP INDEX Cypher for one property. FalkorDB removes one property per DROP statement."
 
-	^ self
-		statementForVerb: 'DROP'
-		properties: { aPropertyName }
-		options: nil
+	^ (self cyCommand: CyDropIndex forProperties: { aPropertyName })
+		cypherString trimRight
+]
+
+{ #category : 'private' }
+FkGraphIndex >> applyIndexTypeTo: aCyIndexCommand [
+	"Range has no type keyword. Fulltext uses the specifier's dedicated shortcut; vector and cch
+	are set as arbitrary type keywords SCypher has no shortcut for."
+
+	self indexType = self class rangeIndexType ifTrue: [ ^ self ].
+	self indexType = self class fulltextIndexType
+		ifTrue: [ ^ aCyIndexCommand spec: [ :specifier | specifier fullText ] ].
+	aCyIndexCommand spec: [ :specifier | specifier type: self indexType asString asUppercase ]
+]
+
+{ #category : 'private' }
+FkGraphIndex >> cyCommand: aCyIndexCommandClass forProperties: aCollection [
+	| entity command |
+	entity := self entityCyObject.
+	command := aCyIndexCommandClass
+		target: entity
+		props: (CyObjects withAll: (aCollection collect: [ :each | entity @ each ])).
+	self applyIndexTypeTo: command.
+	^ command
+]
+
+{ #category : 'private' }
+FkGraphIndex >> entityCyObject [
+	"Answer the CyNode or CyRelationship used both as the FOR target and as the receiver of
+	property accessors. A relationship index targets an undirected ()-[r:TYPE]-() pattern - FalkorDB
+	has no notion of relationship direction for CREATE/DROP INDEX."
+
+	self entityType = self class nodeEntityType
+		ifTrue: [ ^ self entityVariableName asCypherIdentifier node: { self entityName } ].
+	^ (CyNode empty)
+		- (self entityVariableName asCypherIdentifier rel: { self entityName })
+		- CyNode empty
 ]
 
 { #category : 'private' }
@@ -178,16 +214,15 @@ FkGraphIndex >> entityName: aString [
 ]
 
 { #category : 'private' }
-FkGraphIndex >> entityPattern [
-	| quotedName |
-	quotedName := self quotedName: self entityName.
-	self entityType = self class nodeEntityType ifTrue: [ ^ '(e:' , quotedName , ')' ].
-	^ '()-[e:' , quotedName , ']->()'
+FkGraphIndex >> entityType: aString [
+	entityType := aString
 ]
 
 { #category : 'private' }
-FkGraphIndex >> entityType: aString [
-	entityType := aString
+FkGraphIndex >> entityVariableName [
+	^ self entityType = self class nodeEntityType
+		ifTrue: [ 'n' ]
+		ifFalse: [ 'r' ]
 ]
 
 { #category : 'private' }
@@ -213,24 +248,6 @@ FkGraphIndex >> properties: aCollection [
 ]
 
 { #category : 'private' }
-FkGraphIndex >> propertyListFor: aCollection [
-	^ String streamContents: [ :stream |
-		aCollection
-			do: [ :each |
-				stream
-					nextPutAll: 'e.';
-					nextPutAll: (self quotedName: each) ]
-			separatedBy: [ stream nextPutAll: ', ' ] ]
-]
-
-{ #category : 'private' }
-FkGraphIndex >> quotedName: aString [
-	"Backtick-quote a Cypher identifier, doubling any backtick already in the name."
-
-	^ '`' , (aString copyReplaceAll: '`' with: '``') , '`'
-]
-
-{ #category : 'private' }
 FkGraphIndex >> quotedString: aString [
 	"Single-quote a Cypher string literal, doubling any embedded single quote."
 
@@ -245,22 +262,4 @@ FkGraphIndex >> setDimension: anInteger [
 { #category : 'private' }
 FkGraphIndex >> setSimilarityFunction: aString [
 	similarityFunction := aString
-]
-
-{ #category : 'private' }
-FkGraphIndex >> statementForVerb: aVerb properties: aCollection options: aClauseOrNil [
-	^ String streamContents: [ :stream |
-		stream
-			nextPutAll: (self statementPrefixFor: aVerb);
-			nextPutAll: self entityPattern;
-			nextPutAll: ' ON (';
-			nextPutAll: (self propertyListFor: aCollection);
-			nextPut: $).
-		aClauseOrNil ifNotNil: [ :clause | stream space; nextPutAll: clause ] ]
-]
-
-{ #category : 'private' }
-FkGraphIndex >> statementPrefixFor: aVerb [
-	self indexType = self class rangeIndexType ifTrue: [ ^ aVerb , ' INDEX FOR ' ].
-	^ aVerb , ' ' , self indexType asString asUppercase , ' INDEX FOR '
 ]
