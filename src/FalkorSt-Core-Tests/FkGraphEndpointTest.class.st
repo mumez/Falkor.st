@@ -24,6 +24,9 @@ Coverage:
   and clearing them via #graphResetLog:
 - graph-index spec: creating and dropping range, fulltext, and vector indexes on node labels and
   relationship types, and listing them as FkGraphIndexInfo via #graphIndexes:
+- graph-constraints-listing spec: creating UNIQUE and MANDATORY constraints on a node label and a
+  relationship type, and listing them as FkGraphConstraintInfo via #graphConstraints:, tolerating
+  the asynchronous PENDING/UNDER CONSTRUCTION -> OPERATIONAL transition
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -656,6 +659,90 @@ FkGraphEndpointTest >> testGraphIndexDropByRemovesQuotedLabel [
 	self assertListedProperty: 'p' type: 'RANGE' label: 'A)B' entityType: 'NODE'.
 	self assertIndexDropped: (self endpoint graphIndexDropBy: spec on: self graphName).
 	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> constraintInfoTyped: aType entityName: anEntityName entityType: anEntityType [
+	^ (self endpoint graphConstraints: self graphName)
+		detect: [ :each |
+			each constraintType = aType
+				and: [ each entityName = anEntityName and: [ each entityType = anEntityType ] ] ]
+		ifNone: [ nil ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> waitForConstraintSettledType: aType entityName: anEntityName entityType: anEntityType [
+	"Constraint creation is asynchronous: status starts as PENDING/UNDER CONSTRUCTION before
+	becoming OPERATIONAL (or FAILED). Poll briefly rather than asserting immediately."
+
+	| info |
+	20 timesRepeat: [
+		info := self constraintInfoTyped: aType entityName: anEntityName entityType: anEntityType.
+		(info notNil and: [ info status = 'OPERATIONAL' or: [ info status = 'FAILED' ] ])
+			ifTrue: [ ^ info ].
+		(Delay forMilliseconds: 250) wait ].
+	^ info
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertConstraintOperationalType: aType entityName: anEntityName entityType: anEntityType properties: aPropertiesCollection [
+	| info |
+	info := self waitForConstraintSettledType: aType entityName: anEntityName entityType: anEntityType.
+	self assert: info notNil.
+	self assert: info class equals: FkGraphConstraintInfo.
+	self assert: info status equals: 'OPERATIONAL'.
+	self assertCollection: info properties asArray equals: aPropertiesCollection asArray
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsEmptyWhenGraphHasNoConstraints [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self assert: (self endpoint graphConstraints: self graphName) isEmpty
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> createAndAssertConstraintType: aType entityType: anEntityType entityName: anEntityName properties: aPropertiesCollection [
+	self
+		createConstraintType: aType
+		entityType: anEntityType
+		entityName: anEntityName
+		properties: aPropertiesCollection.
+	self
+		assertConstraintOperationalType: aType
+		entityName: anEntityName
+		entityType: anEntityType
+		properties: aPropertiesCollection
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsListsCreatedConstraintsOnNode [
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Person {name: ''Alice'', email: ''alice@example.com''})'.
+	self endpoint graphIndexCreateBy: [ :i | i range; node: 'Person'; props: #('email') ] on: self graphName.
+	self createAndAssertConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email').
+	self createAndAssertConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name')
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> createAndAssertRelationshipConstraintType: aType [
+	self
+		createAndAssertConstraintType: aType
+		entityType: 'RELATIONSHIP'
+		entityName: 'KNOWS'
+		properties: #('since')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsListsCreatedConstraintsOnRelationship [
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Person)-[:KNOWS {since: 2020}]->(:Person)'.
+	self endpoint
+		graphIndexCreateBy: [ :i | i range; relationship: 'KNOWS'; props: #('since') ]
+		on: self graphName.
+	self createAndAssertRelationshipConstraintType: 'UNIQUE'.
+	self createAndAssertRelationshipConstraintType: 'MANDATORY'
 ]
 
 { #category : 'tests' }
