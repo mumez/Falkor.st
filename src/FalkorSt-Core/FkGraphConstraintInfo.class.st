@@ -40,6 +40,9 @@ FkGraphConstraintInfo >> constraintType [
 
 { #category : 'accessing' }
 FkGraphConstraintInfo >> entityName [
+	"The db.constraints() 'label' column, named after FkGraphConstraint>>entityName (not
+	FkGraphIndexInfo>>label) so a listed constraint reads like the one that was built."
+
 	^ self rawConstraintInfo at: 'label' ifAbsent: []
 ]
 

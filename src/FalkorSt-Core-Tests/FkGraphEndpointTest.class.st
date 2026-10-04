@@ -662,22 +662,22 @@ FkGraphEndpointTest >> testGraphIndexDropByRemovesQuotedLabel [
 ]
 
 { #category : 'private' }
-FkGraphEndpointTest >> constraintInfoTyped: aType entityName: anEntityName entityType: anEntityType [
+FkGraphEndpointTest >> constraintInfoOfType: aType entityType: anEntityType entityName: anEntityName [
 	^ (self endpoint graphConstraints: self graphName)
 		detect: [ :each |
 			each constraintType = aType
-				and: [ each entityName = anEntityName and: [ each entityType = anEntityType ] ] ]
+				and: [ each entityType = anEntityType and: [ each entityName = anEntityName ] ] ]
 		ifNone: [ nil ]
 ]
 
 { #category : 'private' }
-FkGraphEndpointTest >> waitForConstraintSettledType: aType entityName: anEntityName entityType: anEntityType [
+FkGraphEndpointTest >> waitForConstraintSettledType: aType entityType: anEntityType entityName: anEntityName [
 	"Constraint creation is asynchronous: status starts as PENDING/UNDER CONSTRUCTION before
 	becoming OPERATIONAL (or FAILED). Poll briefly rather than asserting immediately."
 
 	| info |
 	20 timesRepeat: [
-		info := self constraintInfoTyped: aType entityName: anEntityName entityType: anEntityType.
+		info := self constraintInfoOfType: aType entityType: anEntityType entityName: anEntityName.
 		(info notNil and: [ info status = 'OPERATIONAL' or: [ info status = 'FAILED' ] ])
 			ifTrue: [ ^ info ].
 		(Delay forMilliseconds: 250) wait ].
@@ -685,9 +685,9 @@ FkGraphEndpointTest >> waitForConstraintSettledType: aType entityName: anEntityN
 ]
 
 { #category : 'private' }
-FkGraphEndpointTest >> assertConstraintOperationalType: aType entityName: anEntityName entityType: anEntityType properties: aPropertiesCollection [
+FkGraphEndpointTest >> assertConstraintOperationalType: aType entityType: anEntityType entityName: anEntityName properties: aPropertiesCollection [
 	| info |
-	info := self waitForConstraintSettledType: aType entityName: anEntityName entityType: anEntityType.
+	info := self waitForConstraintSettledType: aType entityType: anEntityType entityName: anEntityName.
 	self assert: info notNil.
 	self assert: info class equals: FkGraphConstraintInfo.
 	self assert: info status equals: 'OPERATIONAL'.
@@ -709,8 +709,8 @@ FkGraphEndpointTest >> createAndAssertConstraintType: aType entityType: anEntity
 		properties: aPropertiesCollection.
 	self
 		assertConstraintOperationalType: aType
-		entityName: anEntityName
 		entityType: anEntityType
+		entityName: anEntityName
 		properties: aPropertiesCollection
 ]
 
