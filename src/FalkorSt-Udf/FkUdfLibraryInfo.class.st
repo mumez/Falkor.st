@@ -4,16 +4,18 @@ of the functions it exposes and, when listed WITHCODE, its source. I am produced
 FkGraphEndpoint>>graphUdfList and its variants; I never talk to FalkorDB myself.
 
 Responsibility:
-- Expose the library name, function names, and source code (nil unless listed WITHCODE) of one
-  GRAPH.UDF LIST entry as read-only accessors over the raw entry
-- Retain that raw entry so a missing or renamed key is still inspectable
+- Map one raw GRAPH.UDF LIST entry (flat key/value pairs) into read-only accessors
+- Treat the library name as required (a missing key signals KeyNotFound rather than hiding a reply
+  format change), while the source code is optional (nil unless listed WITHCODE) and the function
+  names default to empty
+- Retain the raw entry so an unexpected or renamed key is still inspectable
 
 Collaborators:
 - FkGraphEndpoint: builds instances of me from GRAPH.UDF LIST entries
 
 Public API and Key Messages:
 - #libraryName / #functions / #code
-- FkUdfLibraryInfo class >> fromDictionary: - build one instance from a LIST entry dictionary
+- FkUdfLibraryInfo class >> fromListEntry: - build one instance from a raw LIST entry
 "
 Class {
 	#name : 'FkUdfLibraryInfo',
@@ -26,9 +28,9 @@ Class {
 }
 
 { #category : 'instance creation' }
-FkUdfLibraryInfo class >> fromDictionary: aDictionary [
+FkUdfLibraryInfo class >> fromListEntry: flatPairs [
 	^ self new
-		rawLibraryInfo: aDictionary;
+		rawLibraryInfo: (Dictionary newFromPairs: flatPairs);
 		yourself
 ]
 
@@ -44,13 +46,13 @@ FkUdfLibraryInfo >> functions [
 
 { #category : 'accessing' }
 FkUdfLibraryInfo >> libraryName [
-	^ self rawLibraryInfo at: 'library_name' ifAbsent: []
+	^ self rawLibraryInfo at: 'library_name'
 ]
 
 { #category : 'printing' }
 FkUdfLibraryInfo >> printOn: aStream [
 	super printOn: aStream.
-	aStream nextPut: $(; print: self libraryName; nextPut: $)
+	aStream nextPut: $(; print: (self rawLibraryInfo at: 'library_name' ifAbsent: []); nextPut: $)
 ]
 
 { #category : 'private-accessing' }

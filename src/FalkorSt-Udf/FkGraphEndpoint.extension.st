@@ -10,30 +10,30 @@ FkGraphEndpoint >> graphUdfFlush [
 	^ self unifiedCommand: { 'GRAPH.UDF'. 'FLUSH' }
 ]
 
+{ #category : '*FalkorSt-Udf-private' }
+FkGraphEndpoint >> graphUdfLibrariesWithListOptions: listOptions [
+	^ (self unifiedCommand: { 'GRAPH.UDF'. 'LIST' } , listOptions) collect: [ :rawEntry |
+		FkUdfLibraryInfo fromListEntry: rawEntry ]
+]
+
 { #category : '*FalkorSt-Udf' }
 FkGraphEndpoint >> graphUdfList [
-	^ self graphUdfListArgs: #()
+	^ self graphUdfLibrariesWithListOptions: #()
 ]
 
 { #category : '*FalkorSt-Udf' }
 FkGraphEndpoint >> graphUdfList: libraryName [
-	^ self graphUdfListArgs: { libraryName }
-]
-
-{ #category : '*FalkorSt-Udf-private' }
-FkGraphEndpoint >> graphUdfListArgs: optionalArgs [
-	^ (self unifiedCommand: { 'GRAPH.UDF'. 'LIST' } , optionalArgs) collect: [ :rawEntry |
-		FkUdfLibraryInfo fromDictionary: (self dictionaryFromFlatPairs: rawEntry) ]
+	^ self graphUdfLibrariesWithListOptions: { libraryName }
 ]
 
 { #category : '*FalkorSt-Udf' }
 FkGraphEndpoint >> graphUdfListWithCode [
-	^ self graphUdfListArgs: #('WITHCODE')
+	^ self graphUdfLibrariesWithListOptions: #('WITHCODE')
 ]
 
 { #category : '*FalkorSt-Udf' }
 FkGraphEndpoint >> graphUdfListWithCode: libraryName [
-	^ self graphUdfListArgs: { libraryName. 'WITHCODE' }
+	^ self graphUdfLibrariesWithListOptions: { libraryName. 'WITHCODE' }
 ]
 
 { #category : '*FalkorSt-Udf' }
@@ -43,11 +43,9 @@ FkGraphEndpoint >> graphUdfLoad: libraryName code: jsString [
 
 { #category : '*FalkorSt-Udf' }
 FkGraphEndpoint >> graphUdfLoad: libraryName code: jsString replace: aBoolean [
-	| args |
-	args := OrderedCollection with: 'GRAPH.UDF' with: 'LOAD'.
-	aBoolean ifTrue: [ args add: 'REPLACE' ].
-	args add: libraryName; add: jsString.
-	^ self unifiedCommand: args
+	| replaceOption |
+	replaceOption := aBoolean ifTrue: [ #('REPLACE') ] ifFalse: [ #() ].
+	^ self unifiedCommand: { 'GRAPH.UDF'. 'LOAD' } , replaceOption , { libraryName. jsString }
 ]
 
 { #category : '*FalkorSt-Udf' }
