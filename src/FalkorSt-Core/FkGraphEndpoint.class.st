@@ -44,6 +44,8 @@ Collaborators:
   #graphIndexDropBy:on: object-based API
 - FkGraphIndexInfo: the decoded value object I build one per CALL db.indexes() record in
   #graphIndexes:
+- FkGraphConstraintInfo: the decoded value object I build one per CALL db.constraints() record in
+  #graphConstraints:
 - FkSlowLogEntry: the decoded value object I build one per raw GRAPH.SLOWLOG entry in #graphSlowLog:
 
 Public API and Key Messages:
@@ -88,6 +90,8 @@ Public API and Key Messages:
   running its DROP INDEX Cypher via GRAPH.QUERY
 - #graphIndexes: - list a graph's indexes via CALL db.indexes(), answering an OrderedCollection
   of FkGraphIndexInfo
+- #graphConstraints: - list a graph's constraints via CALL db.constraints(), answering an
+  OrderedCollection of FkGraphConstraintInfo
 - #graphCallProcedure:procedure:arguments:yield:readOnly: - call a stored procedure
   (equivalent to falkordb-py's call_procedure), binding arguments as query parameters rather
   than embedding their values
@@ -276,6 +280,12 @@ FkGraphEndpoint >> graphConstraintDropWith: aFkGraphConstraint on: graphName [
 		entityType: aFkGraphConstraint entityType
 		entityName: aFkGraphConstraint entityName
 		properties: aFkGraphConstraint properties
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphConstraints: graphName [
+	^ (self graphCallProcedure: graphName procedure: 'db.constraints') mappedRecords collect: [ :record |
+		FkGraphConstraintInfo fromRecord: record ]
 ]
 
 { #category : 'commands-graph' }
