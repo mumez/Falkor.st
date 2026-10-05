@@ -131,16 +131,29 @@ FkGraphDbTest >> testDropIndexByRemovesTheIndex [
 
 { #category : 'tests' }
 FkGraphDbTest >> testCreateConstraintByListsTheConstraint [
-	| db |
+	"No drop needed: tearDown deletes this test's own graph together with its constraints."
+
+	| db info |
 	db := self db.
 	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
-	[
-		self assert: (db createConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]) equals: 'PENDING'.
-		self assert: (db constraints anySatisfy: [ :info | info label = 'Person' and: [ info properties includes: 'name' ] ]) ]
-		ensure: [
-			[ db dropConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ] ]
-				on: Error
-				do: [ :ex |  ] ]
+	self assert: (db createConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]) equals: 'PENDING'.
+	info := self waitForSettledConstraintIn: db labeled: 'Person'.
+	self assert: info notNil.
+	self assert: info status equals: 'OPERATIONAL'.
+	self assert: (info properties includes: 'name')
+]
+
+{ #category : 'private' }
+FkGraphDbTest >> waitForSettledConstraintIn: aFkGraphDb labeled: aLabel [
+	"Constraint creation is asynchronous: status starts as PENDING/UNDER CONSTRUCTION before
+	becoming OPERATIONAL (or FAILED). Poll briefly rather than asserting immediately."
+
+	| info |
+	20 timesRepeat: [
+		info := aFkGraphDb constraints detect: [ :each | each label = aLabel ] ifNone: [ nil ].
+		(info notNil and: [ #('OPERATIONAL' 'FAILED') includes: info status ]) ifTrue: [ ^ info ].
+		(Delay forMilliseconds: 250) wait ].
+	^ info
 ]
 
 { #category : 'tests' }
@@ -149,6 +162,7 @@ FkGraphDbTest >> testDropConstraintByRemovesTheConstraint [
 	db := self db.
 	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
 	db createConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ].
+	self waitForSettledConstraintIn: db labeled: 'Person'.
 	self assert: (db dropConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]) equals: 'OK'.
 	self assert: db constraints isEmpty
 ]
