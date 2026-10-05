@@ -127,6 +127,8 @@ Public API and Key Messages:
   configuring an FkGraphIndex / FkGraphConstraint builder
 - #callProcedure:arguments:yield: / #callReadOnlyProcedure:arguments:yield: - CALL a stored
   procedure with bound arguments, using my #settings queryTimeoutMsecs like #runCypher:
+- #explain: / #profile: and #slowLog / #resetSlowLog / #memoryUsage - query-diagnostics facades
+  over FkGraphEndpoint; #drop deletes the whole graph key, unlike #deleteAll
 
 Implementation Points:
 - Unlike Neo4j, FalkorDB's plain DELETE on a node auto-detaches its relationships instead of
@@ -593,6 +595,52 @@ FkGraphDb >> endpoint [
 	^ self stick endpoint
 ]
 
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> explain: cypherQueryOrString [
+	^ self explain: cypherQueryOrString arguments: Dictionary new
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> explain: cypherQueryOrString arguments: argsDict [
+	^ self endpoint
+		graphExplain: self name
+		cypher: (self cypherStringFor: cypherQueryOrString)
+		params: argsDict
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> profile: cypherQueryOrString [
+	^ self profile: cypherQueryOrString arguments: Dictionary new
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> profile: cypherQueryOrString arguments: argsDict [
+	^ self endpoint
+		graphProfile: self name
+		cypher: (self cypherStringFor: cypherQueryOrString)
+		params: argsDict
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> slowLog [
+	^ self endpoint graphSlowLog: self name
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> resetSlowLog [
+	^ self endpoint graphResetLog: self name
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> memoryUsage [
+	^ self endpoint graphMemoryUsage: self name
+]
+
+{ #category : 'actions-diagnostics' }
+FkGraphDb >> memoryUsageSamples: sampleCount [
+	^ self endpoint graphMemoryUsage: self name samples: sampleCount
+]
+
 { #category : 'global operations' }
 FkGraphDb >> allLabels [
 	| n query labels label result |
@@ -605,6 +653,11 @@ FkGraphDb >> allLabels [
 	(query addReturn: label) beDistinct.
 	result := self runReadOnlyCypher: query.
 	^ result firstColumnValues
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> allPropertyKeys [
+	^ (self callReadOnlyProcedure: 'db.propertyKeys') firstColumnValues
 ]
 
 { #category : 'global operations' }
@@ -628,6 +681,12 @@ FkGraphDb >> countRelationships [
 ]
 
 { #category : 'global operations' }
+FkGraphDb >> copyTo: destGraphName [
+	self endpoint graphCopy: self name to: destGraphName.
+	^ self class on: self stick named: destGraphName
+]
+
+{ #category : 'global operations' }
 FkGraphDb >> deleteAll [
 	"FalkorDB's plain DELETE already detaches a node's relationships (see the class comment's
 	Implementation Points), so deleting all nodes already deletes all relationships too."
@@ -643,6 +702,19 @@ FkGraphDb >> deleteAllNodes [
 { #category : 'global operations' }
 FkGraphDb >> deleteAllRelationships [
 	^ self deleteRelationshipsTyped: #() havingAll: #()
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> drop [
+	"Unlike #deleteAll, which only removes nodes/relationships and leaves indexes/constraints
+	behind, this deletes the whole graph key - indexes, constraints, and everything else."
+
+	^ self endpoint graphDelete: self name
+]
+
+{ #category : 'global operations' }
+FkGraphDb >> exists [
+	^ self endpoint graphList includes: self name
 ]
 
 { #category : 'global operations' }
