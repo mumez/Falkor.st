@@ -110,3 +110,7 @@ db runCypher: query arguments: { 'minAge' -> 18 } asDictionary. "inspect it"
 
 Commands are implemented, except for administrative ACL commands. A high-level object-graph API
 (`FkGraphDb`) covering node/relationship CRUD and path traversal is also in place; see examples above.
+`FkGraphDb` also offers facades for graph-scoped operations: indexes, constraints, procedure calls,
+query diagnostics (`explain:`, `profile:`, `slowLog`, `memoryUsage`), and graph management (`copyTo:`,
+`drop`, `exists`). Server-wide commands (`GRAPH.LIST`, `GRAPH.CONFIG`, `GRAPH.INFO`) and UDFs stay on
+`FkGraphEndpoint`.
