@@ -115,6 +115,20 @@ FkGraphEndpointProcedureCallTest >> testGraphCallProcedureYieldSubsetLimitsResul
 ]
 
 { #category : 'tests' }
+FkGraphEndpointProcedureCallTest >> testGraphCallProcedureTimeoutWithGenerousTimeoutSucceeds [
+	| result |
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	result := self endpoint
+		graphCallProcedure: self graphName
+		procedure: 'db.labels'
+		arguments: #()
+		yield: nil
+		readOnly: false
+		timeout: 10000.
+	self assert: (result records collect: [ :row | row first ]) asSet equals: #('Person') asSet
+]
+
+{ #category : 'tests' }
 FkGraphEndpointProcedureCallTest >> testGraphCallProcedureReadOnlyTrueUsesRoQuery [
 	| result |
 	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.

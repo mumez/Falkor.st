@@ -315,15 +315,32 @@ FkGraphEndpoint >> graphCallProcedure: graphName procedure: procedureName argume
 	collection of column names to YIELD.
 	aBoolean true routes the call through GRAPH.RO_QUERY, false through GRAPH.QUERY."
 
+	^ self
+		graphCallProcedure: graphName
+		procedure: procedureName
+		arguments: argumentsCollection
+		yield: yieldNamesOrNil
+		readOnly: aBoolean
+		timeout: self queryTimeoutMsecs
+]
+
+{ #category : 'commands-graph' }
+FkGraphEndpoint >> graphCallProcedure: graphName procedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil readOnly: aBoolean timeout: timeoutMsecsOrNil [
+	"Like #graphCallProcedure:procedure:arguments:yield:readOnly:, but overrides the query TIMEOUT
+	for this call only."
+
 	| cypherString params |
 	cypherString := self
 		procedureCallCypherFor: procedureName
 		arguments: argumentsCollection
 		yield: yieldNamesOrNil.
 	params := self procedureCallParamsFor: argumentsCollection.
-	^ aBoolean
-		ifTrue: [ self graphRoQuery: graphName cypher: cypherString params: params ]
-		ifFalse: [ self graphQuery: graphName cypher: cypherString params: params ]
+	^ self
+		executeGraphCommand: (aBoolean ifTrue: [ 'GRAPH.RO_QUERY' ] ifFalse: [ 'GRAPH.QUERY' ])
+		graph: graphName
+		cypher: (self prependParams: params to: cypherString)
+		compact: true
+		timeout: timeoutMsecsOrNil
 ]
 
 { #category : 'commands-graph' }
