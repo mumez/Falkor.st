@@ -1013,11 +1013,20 @@ FkGraphDbTest >> testProfileArgumentsAnswersNonEmptyReply [
 			isEmpty
 ]
 
+{ #category : 'private' }
+FkGraphDbTest >> runQuerySlowEnoughForSlowLogOn: db [
+	"FalkorDB only records queries slower than about 10ms in GRAPH.SLOWLOG. This query takes
+	tens of milliseconds even on fast hardware, so the margin is on the fast side; slower
+	machines only make it more likely to be recorded."
+
+	db runCypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'
+]
+
 { #category : 'tests' }
 FkGraphDbTest >> testSlowLogAnswersEntriesForSlowQuery [
 	| db reply entry |
 	db := self db.
-	db runCypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
+	self runQuerySlowEnoughForSlowLogOn: db.
 	reply := db slowLog.
 	self deny: reply isEmpty.
 	entry := reply first.
@@ -1029,7 +1038,7 @@ FkGraphDbTest >> testSlowLogAnswersEntriesForSlowQuery [
 FkGraphDbTest >> testResetSlowLogEmptiesTheSlowLog [
 	| db |
 	db := self db.
-	db runCypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
+	self runQuerySlowEnoughForSlowLogOn: db.
 	self deny: db slowLog isEmpty.
 	db resetSlowLog.
 	self assert: db slowLog isEmpty

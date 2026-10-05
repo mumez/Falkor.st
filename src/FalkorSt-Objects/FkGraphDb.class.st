@@ -714,6 +714,8 @@ FkGraphDb >> drop [
 
 { #category : 'global operations' }
 FkGraphDb >> exists [
+	"GRAPH.LIST answers every graph name on the server, so this is not a single-key check."
+
 	^ self endpoint graphList includes: self name
 ]
 
