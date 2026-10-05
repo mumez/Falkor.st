@@ -55,7 +55,7 @@ FkGraphEndpointUdfTest >> testDeleteRemovesLibrary [
 { #category : 'tests' }
 FkGraphEndpointUdfTest >> testFlushRemovesAllLibraries [
 	self endpoint graphUdfLoad: self libraryName code: self upperCaseLibraryCode.
-	(self endpoint graphUdfList allSatisfy: [ :each | each libraryName = self libraryName ])
+	(self endpoint graphUdfList allSatisfy: [ :each | each name = self libraryName ])
 		ifFalse: [ ^ self skip: 'other UDF libraries exist on the server; not flushing them' ].
 	self assert: self endpoint graphUdfFlush equals: 'OK'.
 	self assert: self endpoint graphUdfList isEmpty
@@ -67,14 +67,14 @@ FkGraphEndpointUdfTest >> testListFiltersByLibraryName [
 	self endpoint graphUdfLoad: self libraryName code: self upperCaseLibraryCode.
 	self endpoint graphUdfLoad: self otherLibraryName code: self echoLibraryCode.
 	infos := self endpoint graphUdfList: self libraryName.
-	self assert: (infos collect: [ :each | each libraryName ]) asArray equals: { self libraryName }
+	self assert: (infos collect: [ :each | each name ]) asArray equals: { self libraryName }
 ]
 
 { #category : 'tests' }
 FkGraphEndpointUdfTest >> testListIncludesLoadedLibraryWithoutCode [
 	| info |
 	self endpoint graphUdfLoad: self libraryName code: self upperCaseLibraryCode.
-	info := (self endpoint graphUdfList detect: [ :each | each libraryName = self libraryName ]).
+	info := (self endpoint graphUdfList detect: [ :each | each name = self libraryName ]).
 	self assert: info functions asArray equals: #('Up').
 	self assert: info code isNil
 ]
@@ -86,7 +86,7 @@ FkGraphEndpointUdfTest >> testListWithCodeIncludesSource [
 		assert: (self endpoint graphUdfListWithCode: self libraryName) first code
 		equals: self upperCaseLibraryCode.
 	self assert: ((self endpoint graphUdfListWithCode
-			detect: [ :each | each libraryName = self libraryName ]) code)
+			detect: [ :each | each name = self libraryName ]) code)
 		equals: self upperCaseLibraryCode
 ]
 

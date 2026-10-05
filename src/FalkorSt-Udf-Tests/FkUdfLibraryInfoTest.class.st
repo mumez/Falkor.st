@@ -12,7 +12,7 @@ Class {
 FkUdfLibraryInfoTest >> testAccessorsReadListEntry [
 	| info |
 	info := FkUdfLibraryInfo fromListEntry: #('library_name' 'StringUtils' 'functions' #('Up' 'Add')).
-	self assert: info libraryName equals: 'StringUtils'.
+	self assert: info name equals: 'StringUtils'.
 	self assert: info functions asArray equals: #('Up' 'Add').
 	self assert: info code isNil
 ]
@@ -31,8 +31,16 @@ FkUdfLibraryInfoTest >> testFunctionsDefaultToEmptyWhenAbsent [
 ]
 
 { #category : 'tests' }
+FkUdfLibraryInfoTest >> testPrintStringShowsAllRawEntries [
+	| printed |
+	printed := (FkUdfLibraryInfo fromListEntry: #('library_name' 'StringUtils' 'renamed_key' 42)) printString.
+	self assert: (printed includesSubstring: 'StringUtils').
+	self assert: (printed includesSubstring: 'renamed_key')
+]
+
+{ #category : 'tests' }
 FkUdfLibraryInfoTest >> testMissingLibraryNameSignalsKeyNotFound [
 	self
-		should: [ (FkUdfLibraryInfo fromListEntry: #('functions' #('Up'))) libraryName ]
+		should: [ (FkUdfLibraryInfo fromListEntry: #('functions' #('Up'))) name ]
 		raise: KeyNotFound
 ]

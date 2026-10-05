@@ -14,7 +14,7 @@ Collaborators:
 - FkGraphEndpoint: builds instances of me from GRAPH.UDF LIST entries
 
 Public API and Key Messages:
-- #libraryName / #functions / #code
+- #name / #functions / #code
 - FkUdfLibraryInfo class >> fromListEntry: - build one instance from a raw LIST entry
 "
 Class {
@@ -45,14 +45,14 @@ FkUdfLibraryInfo >> functions [
 ]
 
 { #category : 'accessing' }
-FkUdfLibraryInfo >> libraryName [
+FkUdfLibraryInfo >> name [
 	^ self rawLibraryInfo at: 'library_name'
 ]
 
 { #category : 'printing' }
 FkUdfLibraryInfo >> printOn: aStream [
 	super printOn: aStream.
-	aStream nextPut: $(; print: (self rawLibraryInfo at: 'library_name' ifAbsent: []); nextPut: $)
+	aStream print: self rawLibraryInfo associations
 ]
 
 { #category : 'private-accessing' }
