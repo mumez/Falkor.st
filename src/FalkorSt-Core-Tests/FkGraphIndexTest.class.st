@@ -1,8 +1,10 @@
 "
 I test the CREATE INDEX and DROP INDEX Cypher that FkGraphIndex renders, without a FalkorDB
 connection. Each index kind is covered for both a node label and a relationship type (cch is
-relationship-only), including vector OPTIONS on create, their absence on drop, and SCypher's
-backtick quoting of names that would otherwise break the Cypher syntax.
+relationship-only), including vector OPTIONS on create, their absence on drop, SCypher's
+backtick quoting of names that would otherwise break the Cypher syntax, and #validate rejecting
+an incomplete builder (missing kind, entity, properties, or a vector index without dimension:)
+at conversion time.
 "
 Class {
 	#name : 'FkGraphIndexTest',
@@ -210,6 +212,51 @@ FkGraphIndexTest >> testDropCypherForRelationshipVectorIndexOmitsOptions [
 	self
 		assert: cypher
 		equals: 'DROP VECTOR INDEX FOR ()-[r:SIMILAR]-() ON (r.embedding)'
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testCreateCypherRaisesWhenIndexTypeNotSet [
+	self
+		should: [ self cypherBuiltBy: [ :index | index node: 'Person'; props: #('email') ] ]
+		raise: RsError
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testCreateCypherRaisesWhenEntityNotSet [
+	self
+		should: [ self cypherBuiltBy: [ :index | index range; props: #('email') ] ]
+		raise: RsError
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testCreateCypherRaisesWhenPropertiesNotSet [
+	self
+		should: [ self cypherBuiltBy: [ :index | index range; node: 'Person' ] ]
+		raise: RsError
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testCreateCypherRaisesWhenPropertiesEmpty [
+	self
+		should: [ self cypherBuiltBy: [ :index | index range; node: 'Person'; props: #() ] ]
+		raise: RsError
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testCreateCypherRaisesWhenVectorIndexHasNoDimension [
+	self
+		should: [
+			self cypherBuiltBy: [ :index |
+				index vector; node: 'Doc'; props: #('embedding') ] ]
+		raise: RsError
+]
+
+{ #category : 'tests' }
+FkGraphIndexTest >> testDropCypherForPropertyRaisesWhenIncomplete [
+	self
+		should: [
+			self dropCypherForProperty: 'email' builtBy: [ :index | index node: 'Person'; props: #('email') ] ]
+		raise: RsError
 ]
 
 { #category : 'tests' }

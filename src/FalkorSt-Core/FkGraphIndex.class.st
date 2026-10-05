@@ -22,6 +22,9 @@ Public API and Key Messages:
 - #dimension: / #similarityFunction: - vector OPTIONS
 - #createCypher - the CREATE INDEX statement
 - #dropCypherForProperty: - the DROP INDEX statement for one property. FalkorDB removes one property per DROP, so a multi-property spec is dropped by calling this once per property
+- #validate - raises RsError invalidArguments when indexType, entity, or properties was never set,
+  or when a vector index has no dimension:. Called automatically at conversion time, not from the
+  fluent setters
 "
 Class {
 	#name : 'FkGraphIndex',
@@ -184,6 +187,7 @@ FkGraphIndex >> applyIndexTypeTo: aCyIndexCommand [
 { #category : 'private' }
 FkGraphIndex >> cyCommand: aCyIndexCommandClass forProperties: aCollection [
 	| entity command |
+	self validate.
 	entity := self entityCyObject.
 	command := aCyIndexCommandClass
 		target: entity
@@ -259,4 +263,25 @@ FkGraphIndex >> setDimension: anInteger [
 { #category : 'private' }
 FkGraphIndex >> setSimilarityFunction: aString [
 	similarityFunction := aString
+]
+
+{ #category : 'validation' }
+FkGraphIndex >> validate [
+	"Fail fast with RsError invalidArguments rather than letting #createCypher or
+	#dropCypherForProperty: render an ill-formed statement."
+
+	(self indexType isNil or: [
+		self entityType isNil or: [ self properties isNil or: [ self properties isEmpty ] ] ])
+		ifTrue: [
+			^ self signalInvalidArguments:
+				'FkGraphIndex requires indexType, entity (node:/relationship:), and props: to be set' ].
+	(self indexType = self class vectorIndexType and: [ self dimension isNil ])
+		ifTrue: [
+			^ self signalInvalidArguments:
+				'FkGraphIndex requires dimension: to be set for a vector index' ]
+]
+
+{ #category : 'error signaling' }
+FkGraphIndex >> signalInvalidArguments: aMessageString [
+	^ RsError invalidArguments signal: aMessageString
 ]

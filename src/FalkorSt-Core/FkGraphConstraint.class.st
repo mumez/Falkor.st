@@ -21,6 +21,9 @@ Public API and Key Messages:
 - #relationship: aRelType - set the entity type to 'RELATIONSHIP' and the entity name to aRelType
 - #props: aCollection - set the property names the constraint covers
 - #constraintType / #entityType / #entityName / #properties - plain accessors
+- #validate - raises RsError invalidArguments when constraintType, entity, or properties was
+  never set. Called automatically by FkGraphEndpoint at conversion time, not from the fluent
+  setters
 "
 Class {
 	#name : 'FkGraphConstraint',
@@ -105,4 +108,21 @@ FkGraphConstraint >> relationship: aRelType [
 FkGraphConstraint >> unique [
 	self constraintType: 'UNIQUE'.
 	^ self
+]
+
+{ #category : 'validation' }
+FkGraphConstraint >> validate [
+	"Fail fast with RsError invalidArguments rather than letting FkGraphEndpoint send an
+	ill-formed GRAPH.CONSTRAINT CREATE/DROP command."
+
+	(self constraintType isNil or: [
+		self entityType isNil or: [ self properties isNil or: [ self properties isEmpty ] ] ])
+		ifTrue: [
+			^ self signalInvalidArguments:
+				'FkGraphConstraint requires constraintType (unique/mandatory), entity (node:/relationship:), and props: to be set' ]
+]
+
+{ #category : 'error signaling' }
+FkGraphConstraint >> signalInvalidArguments: aMessageString [
+	^ RsError invalidArguments signal: aMessageString
 ]
