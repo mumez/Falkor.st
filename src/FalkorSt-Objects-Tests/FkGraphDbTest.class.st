@@ -954,3 +954,159 @@ FkGraphDbTest >> testOrphanedNodesAnswersOnlyNodesWithNoRelationships [
 	self assert: db orphanedNodes size equals: 1.
 	self assert: (db orphanedNodes first propertyAt: 'name') equals: 'Lonely'
 ]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExplainWithAStringAnswersNonEmptyPlan [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	self deny: (db explain: 'MATCH (p:Person) RETURN p') isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExplainWithACyQueryAnswersNonEmptyPlan [
+	| db p query |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	p := 'p' asCypherIdentifier.
+	query := CyQuery match: (CyNode name: p labels: #('Person')).
+	query addReturn: p.
+	self deny: (db explain: query) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExplainArgumentsAnswersNonEmptyPlan [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	self deny:
+		(db explain: 'MATCH (p:Person {name: $name}) RETURN p' arguments: { 'name' -> 'Alice' } asDictionary)
+			isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testProfileWithAStringAnswersNonEmptyReply [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	self deny: (db profile: 'MATCH (p:Person) RETURN p') isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testProfileWithACyQueryAnswersNonEmptyReply [
+	| db p query |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	p := 'p' asCypherIdentifier.
+	query := CyQuery match: (CyNode name: p labels: #('Person')).
+	query addReturn: p.
+	self deny: (db profile: query) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testProfileArgumentsAnswersNonEmptyReply [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	self deny:
+		(db profile: 'MATCH (p:Person {name: $name}) RETURN p' arguments: { 'name' -> 'Alice' } asDictionary)
+			isEmpty
+]
+
+{ #category : 'private' }
+FkGraphDbTest >> runQuerySlowEnoughForSlowLogOn: db [
+	"FalkorDB only records queries slower than about 10ms in GRAPH.SLOWLOG. This query takes
+	tens of milliseconds even on fast hardware, so the margin is on the fast side; slower
+	machines only make it more likely to be recorded."
+
+	db runCypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testSlowLogAnswersEntriesForSlowQuery [
+	| db reply entry |
+	db := self db.
+	self runQuerySlowEnoughForSlowLogOn: db.
+	reply := db slowLog.
+	self deny: reply isEmpty.
+	entry := reply first.
+	self assert: entry class equals: FkSlowLogEntry.
+	self assert: entry command equals: 'GRAPH.QUERY'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testResetSlowLogEmptiesTheSlowLog [
+	| db |
+	db := self db.
+	self runQuerySlowEnoughForSlowLogOn: db.
+	self deny: db slowLog isEmpty.
+	db resetSlowLog.
+	self assert: db slowLog isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMemoryUsageAnswersANonEmptyDictionary [
+	| db reply |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := db memoryUsage.
+	self assert: reply class equals: Dictionary.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testMemoryUsageSamplesAnswersANonEmptyDictionary [
+	| db reply |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	reply := db memoryUsageSamples: 5.
+	self assert: reply class equals: Dictionary.
+	self deny: reply isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCopyToAnswersANewGraphDbWithMatchingData [
+	| db destGraphName destDb |
+	db := self db.
+	destGraphName := self graphName , '_copyDest'.
+	db createNodeLabeled: 'Person'.
+	db createNodeLabeled: 'Person'.
+	[
+		destDb := db copyTo: destGraphName.
+		self assert: destDb class equals: FkGraphDb.
+		self assert: destDb name equals: destGraphName.
+		self assert: destDb stick == db stick.
+		self assert: destDb countNodes equals: db countNodes ]
+		ensure: [ self endpoint graphDelete: destGraphName ]
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDropRemovesTheGraphSoItNoLongerExists [
+	| db |
+	db := self db.
+	db createNodeLabeled: 'Person'.
+	self assert: db exists.
+	db drop.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExistsAnswersFalseWhenTheGraphWasNeverCreated [
+	self deny: self db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testExistsAnswersTrueAfterAWrite [
+	| db |
+	db := self db.
+	db createNodeLabeled: 'Person'.
+	self assert: db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testAllPropertyKeysAnswersEveryDistinctPropertyKeyInTheGraph [
+	| db |
+	db := self db.
+	db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice'. 'age' -> 30 }.
+	self assert: db allPropertyKeys asSet equals: #('name' 'age') asSet
+]
