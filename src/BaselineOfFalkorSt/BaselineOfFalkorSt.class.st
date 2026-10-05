@@ -20,13 +20,19 @@ BaselineOfFalkorSt >> baseline: spec [
 			package: 'FalkorSt-Objects' with: [ spec requires: #('FalkorSt-Core' 'SCypher') ].
 		spec
 			package: 'FalkorSt-Objects-Tests' with: [ spec requires: #('FalkorSt-Core-Tests' 'FalkorSt-Objects') ].
+		spec
+			package: 'FalkorSt-Udf' with: [ spec requires: #('FalkorSt-Core') ].
+		spec
+			package: 'FalkorSt-Udf-Tests' with: [ spec requires: #('FalkorSt-Core-Tests' 'FalkorSt-Udf') ].
 
 		spec
-			group: 'default' with: #('Core' 'Objects' 'Tests');
+			group: 'default' with: #('Core' 'Objects' 'Udf' 'Tests');
 			group: 'Core' with: #('FalkorSt-Core');
-			group: 'Tests' with: #('FalkorSt-Core-Tests' 'FalkorSt-Objects' 'FalkorSt-Objects-Tests');
+			group: 'Tests' with: #('FalkorSt-Core-Tests' 'FalkorSt-Objects' 'FalkorSt-Objects-Tests' 'FalkorSt-Udf' 'FalkorSt-Udf-Tests');
 			group: 'Objects' with: #('FalkorSt-Objects');
-			group: 'ObjectsTests' with: #('FalkorSt-Objects-Tests') ]
+			group: 'ObjectsTests' with: #('FalkorSt-Objects-Tests');
+			group: 'Udf' with: #('FalkorSt-Udf');
+			group: 'UdfTests' with: #('FalkorSt-Udf-Tests') ]
 ]
 
 { #category : 'external projects' }

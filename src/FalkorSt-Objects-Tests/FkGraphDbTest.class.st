@@ -17,6 +17,7 @@ Coverage:
 - graph-object-api spec: ""Counting nodes/relationships and listing distinct labels/types""
 - graph-object-api spec: ""Bulk-deleting nodes, relationships, or the whole graph""
 - graph-object-api spec: ""Finding orphaned nodes""
+- index/constraint/procedure facades delegating to FkGraphEndpoint for this graph
 "
 Class {
 	#name : 'FkGraphDbTest',
@@ -105,6 +106,102 @@ FkGraphDbTest >> testRunReadOnlyCypherRunsAReadQuery [
 	db := self db.
 	db runCypher: 'CREATE (:Person)'.
 	self assert: (db runReadOnlyCypher: 'MATCH (p:Person) RETURN count(p)') records first first equals: 1
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCreateIndexByListsTheIndex [
+	| db result |
+	db := self db.
+	db runCypher: 'CREATE (:Person {email: ''alice@example.com''})'.
+	result := db createIndexBy: [ :i | i range; node: 'Person'; props: #('email') ].
+	self assert: (result statistics anySatisfy: [ :line | line includesSubstring: 'Indices created' ]).
+	self assert: (db indexes anySatisfy: [ :info | info label = 'Person' and: [ info properties includes: 'email' ] ])
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDropIndexByRemovesTheIndex [
+	| db result |
+	db := self db.
+	db runCypher: 'CREATE (:Person {email: ''alice@example.com''})'.
+	db createIndexBy: [ :i | i range; node: 'Person'; props: #('email') ].
+	result := db dropIndexBy: [ :i | i range; node: 'Person'; props: #('email') ].
+	self assert: (result statistics anySatisfy: [ :line | line includesSubstring: 'Indices deleted' ]).
+	self assert: db indexes isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCreateConstraintByListsTheConstraint [
+	"No drop needed: tearDown deletes this test's own graph together with its constraints."
+
+	| db info |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	self assert: (db createConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]) equals: 'PENDING'.
+	info := self waitForSettledConstraintIn: db labeled: 'Person'.
+	self assert: info notNil.
+	self assert: info status equals: 'OPERATIONAL'.
+	self assert: (info properties includes: 'name')
+]
+
+{ #category : 'private' }
+FkGraphDbTest >> waitForSettledConstraintIn: aFkGraphDb labeled: aLabel [
+	"Constraint creation is asynchronous: status starts as PENDING/UNDER CONSTRUCTION before
+	becoming OPERATIONAL (or FAILED). Poll briefly rather than asserting immediately."
+
+	| info |
+	20 timesRepeat: [
+		info := aFkGraphDb constraints detect: [ :each | each label = aLabel ] ifNone: [ nil ].
+		(info notNil and: [ #('OPERATIONAL' 'FAILED') includes: info status ]) ifTrue: [ ^ info ].
+		(Delay forMilliseconds: 250) wait ].
+	^ info
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testDropConstraintByRemovesTheConstraint [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person {name: ''Alice''})'.
+	db createConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ].
+	self waitForSettledConstraintIn: db labeled: 'Person'.
+	self assert: (db dropConstraintBy: [ :c | c mandatory; node: 'Person'; props: #('name') ]) equals: 'OK'.
+	self assert: db constraints isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCallProcedureAnswersLabelsInTheGraph [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person), (:Company)'.
+	self
+		assert: ((db callProcedure: 'db.labels') records collect: [ :row | row first ]) asSet
+		equals: #('Person' 'Company') asSet
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCallProcedureArgumentsYieldTimeoutWithGenerousTimeoutSucceeds [
+	| db result |
+	db := self db.
+	db runCypher: 'CREATE (:Person)'.
+	result := db callProcedure: 'db.labels' arguments: #() yield: 'label' timeout: 10000.
+	self assert: result header equals: #('label') asOrderedCollection.
+	self assert: result records first first equals: 'Person'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCallReadOnlyProcedureAnswersLabelsInTheGraph [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person)'.
+	self assert: (db callReadOnlyProcedure: 'db.labels') records first first equals: 'Person'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testCallReadOnlyProcedureArgumentsYieldTimeoutWithGenerousTimeoutSucceeds [
+	| db result |
+	db := self db.
+	db runCypher: 'CREATE (:Person)'.
+	result := db callReadOnlyProcedure: 'db.labels' arguments: #() yield: 'label' timeout: 10000.
+	self assert: result records first first equals: 'Person'
 ]
 
 { #category : 'tests' }

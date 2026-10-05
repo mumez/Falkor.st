@@ -122,6 +122,11 @@ Public API and Key Messages:
   property equality across a whole assoc array or an arbitrary where-clause block, answering the
   query's statistics
 - #orphanedNodes - MATCH nodes with no relationships at all, answering a collection of FkGraphNode
+- #indexes / #createIndexBy: / #dropIndexBy: and #constraints / #createConstraintBy: /
+  #dropConstraintBy: - list, create, or drop this graph's indexes and constraints, the block
+  configuring an FkGraphIndex / FkGraphConstraint builder
+- #callProcedure:arguments:yield: / #callReadOnlyProcedure:arguments:yield: - CALL a stored
+  procedure with bound arguments, using my #settings queryTimeoutMsecs like #runCypher:
 
 Implementation Points:
 - Unlike Neo4j, FalkorDB's plain DELETE on a node auto-detaches its relationships instead of
@@ -788,6 +793,96 @@ FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict timeout:
 		cypher: (self cypherStringFor: cypherQueryOrString)
 		params: argsDict
 		compact: true
+		timeout: timeoutMsecsOrNil
+]
+
+{ #category : 'actions-indexes' }
+FkGraphDb >> indexes [
+	^ self endpoint graphIndexes: self name
+]
+
+{ #category : 'actions-indexes' }
+FkGraphDb >> createIndexBy: aBlock [
+	^ self endpoint graphIndexCreateBy: aBlock on: self name
+]
+
+{ #category : 'actions-indexes' }
+FkGraphDb >> dropIndexBy: aBlock [
+	^ self endpoint graphIndexDropBy: aBlock on: self name
+]
+
+{ #category : 'actions-constraints' }
+FkGraphDb >> constraints [
+	^ self endpoint graphConstraints: self name
+]
+
+{ #category : 'actions-constraints' }
+FkGraphDb >> createConstraintBy: aBlock [
+	^ self endpoint graphConstraintCreateBy: aBlock on: self name
+]
+
+{ #category : 'actions-constraints' }
+FkGraphDb >> dropConstraintBy: aBlock [
+	^ self endpoint graphConstraintDropBy: aBlock on: self name
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callProcedure: procedureName [
+	^ self callProcedure: procedureName arguments: #()
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callProcedure: procedureName arguments: argumentsCollection [
+	^ self callProcedure: procedureName arguments: argumentsCollection yield: nil
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil [
+	^ self
+		callProcedure: procedureName
+		arguments: argumentsCollection
+		yield: yieldNamesOrNil
+		timeout: self settings queryTimeoutMsecs
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil timeout: timeoutMsecsOrNil [
+	^ self endpoint
+		graphCallProcedure: self name
+		procedure: procedureName
+		arguments: argumentsCollection
+		yield: yieldNamesOrNil
+		readOnly: false
+		timeout: timeoutMsecsOrNil
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callReadOnlyProcedure: procedureName [
+	^ self callReadOnlyProcedure: procedureName arguments: #()
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection [
+	^ self callReadOnlyProcedure: procedureName arguments: argumentsCollection yield: nil
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil [
+	^ self
+		callReadOnlyProcedure: procedureName
+		arguments: argumentsCollection
+		yield: yieldNamesOrNil
+		timeout: self settings queryTimeoutMsecs
+]
+
+{ #category : 'actions-procedures' }
+FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil timeout: timeoutMsecsOrNil [
+	^ self endpoint
+		graphCallProcedure: self name
+		procedure: procedureName
+		arguments: argumentsCollection
+		yield: yieldNamesOrNil
+		readOnly: true
 		timeout: timeoutMsecsOrNil
 ]
 
