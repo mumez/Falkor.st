@@ -22,6 +22,11 @@ Coverage:
 - graph-memory spec: reporting per-graph memory usage statistics, decoded into a Dictionary
 - graph-slowlog spec: reporting the graph's slowest queries, decoded into FkSlowLogEntry instances,
   and clearing them via #graphResetLog:
+- graph-index spec: creating and dropping range, fulltext, and vector indexes on node labels and
+  relationship types, and listing them as FkGraphIndexInfo via #graphIndexes:
+- graph-constraints-listing spec: creating UNIQUE and MANDATORY constraints on a node label and a
+  relationship type, and listing them as FkGraphConstraintInfo via #graphConstraints:, tolerating
+  the asynchronous PENDING/UNDER CONSTRUCTION -> OPERATIONAL transition
 "
 Class {
 	#name : 'FkGraphEndpointTest',
@@ -405,14 +410,14 @@ FkGraphEndpointTest >> testGraphMemoryUsageWithSamplesAnswersDictionaryWithData 
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphSlowLogAnswersEntriesForSlowQuery [
 	| reply entry |
-	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
 	reply := self endpoint graphSlowLog: self graphName.
 	self assert: reply class equals: OrderedCollection.
 	self deny: reply isEmpty.
 	entry := reply first.
 	self assert: entry class equals: FkSlowLogEntry.
 	self assert: entry command equals: 'GRAPH.QUERY'.
-	self assert: entry query equals: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self assert: entry query equals: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
 	self assert: entry executionTimeMs > 0.
 	self assert: entry timestamp notNil.
 	self assert: entry parameters isNil
@@ -424,12 +429,12 @@ FkGraphEndpointTest >> testGraphSlowLogDecodesParametersWhenQueryWasBoundWithThe
 	self endpoint
 		graphQuery: self graphName
 		cypher: 'UNWIND range(1, $n) AS x RETURN sum(x)'
-		params: (Dictionary new at: 'n' put: 200000; yourself).
+		params: (Dictionary new at: 'n' put: 2000000; yourself).
 	reply := self endpoint graphSlowLog: self graphName.
 	self deny: reply isEmpty.
 	entry := reply first.
 	self assert: entry parameters notNil.
-	self assert: (entry parameters includesSubstring: 'n=200000')
+	self assert: (entry parameters includesSubstring: 'n=2000000')
 ]
 
 { #category : 'tests' }
@@ -444,7 +449,7 @@ FkGraphEndpointTest >> testGraphSlowLogAnswersEmptyForGraphWithoutSlowQueries [
 { #category : 'tests' }
 FkGraphEndpointTest >> testGraphResetLogClearsEntries [
 	| resetReply reply |
-	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 200000) AS x RETURN sum(x)'.
+	self endpoint graphQuery: self graphName cypher: 'UNWIND range(1, 2000000) AS x RETURN sum(x)'.
 	self deny: (self endpoint graphSlowLog: self graphName) isEmpty.
 	resetReply := self endpoint graphResetLog: self graphName.
 	self assert: resetReply equals: 'OK'.
@@ -523,6 +528,221 @@ FkGraphEndpointTest >> testGraphConstraintDropBySucceeds [
 			on: self graphName.
 		self assert: reply equals: 'OK' ]
 		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertIndexCreated: result [
+	self assert: result class equals: FkQueryResult.
+	self assert: (result statistics anySatisfy: [ :line | line includesSubstring: 'Indices created' ])
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertIndexDropped: result [
+	self assert: result class equals: FkQueryResult.
+	self assert: (result statistics anySatisfy: [ :line | line includesSubstring: 'Indices deleted' ])
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> indexInfoLabeled: aLabel entityType: anEntityType [
+	^ (self endpoint graphIndexes: self graphName)
+		detect: [ :each | each label = aLabel and: [ each entityType = anEntityType ] ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertListedProperty: aProperty type: aType label: aLabel entityType: anEntityType [
+	| info |
+	info := self indexInfoLabeled: aLabel entityType: anEntityType.
+	self assert: info class equals: FkGraphIndexInfo.
+	self assert: ((info types at: aProperty) includes: aType)
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> indexCreateSpecs [
+	^ {
+		[ :index | index range; node: 'Person'; props: #('email') ].
+		[ :index | index fulltext; node: 'Person'; props: #('name' 'bio') ].
+		[ :index | index vector; node: 'Doc'; props: #('embedding'); dimension: 4; similarityFunction: 'euclidean' ].
+		[ :index | index range; relationship: 'KNOWS'; props: #('since') ].
+		[ :index | index fulltext; relationship: 'KNOWS'; props: #('note') ].
+		[ :index | index vector; relationship: 'SIMILAR'; props: #('embedding'); dimension: 4; similarityFunction: 'cosine' ] }
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexCreateBySucceedsForEachKindAndEntity [
+	self indexCreateSpecs do: [ :spec |
+		self assertIndexCreated: (self endpoint graphIndexCreateBy: spec on: self graphName) ]
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexCreateWithSucceeds [
+	| index result |
+	index := FkGraphIndex new.
+	self indexCreateSpecs first value: index.
+	result := self endpoint graphIndexCreateWith: index on: self graphName.
+	self assertIndexCreated: result
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexCreateByQuotesLabelThatWouldBreakUnquotedCypher [
+	| result |
+	result := self endpoint
+		graphIndexCreateBy: [ :index | index range; node: 'A)B'; props: #('p') ]
+		on: self graphName.
+	self assertIndexCreated: result
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexesEmptyWhenGraphHasNoIndexes [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertCreatedIndexSpecsAreListed [
+	self assertListedProperty: 'email' type: 'RANGE' label: 'Person' entityType: 'NODE'.
+	self assertListedProperty: 'name' type: 'FULLTEXT' label: 'Person' entityType: 'NODE'.
+	self assertListedProperty: 'bio' type: 'FULLTEXT' label: 'Person' entityType: 'NODE'.
+	self
+		assertVectorProperty: 'embedding'
+		label: 'Doc'
+		entityType: 'NODE'
+		similarityFunction: 'euclidean'.
+	self assertListedProperty: 'since' type: 'RANGE' label: 'KNOWS' entityType: 'RELATIONSHIP'.
+	self assertListedProperty: 'note' type: 'FULLTEXT' label: 'KNOWS' entityType: 'RELATIONSHIP'.
+	self
+		assertVectorProperty: 'embedding'
+		label: 'SIMILAR'
+		entityType: 'RELATIONSHIP'
+		similarityFunction: 'cosine'
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertVectorProperty: aProperty label: aLabel entityType: anEntityType similarityFunction: aFunction [
+	| info options |
+	self
+		assertListedProperty: aProperty
+		type: 'VECTOR'
+		label: aLabel
+		entityType: anEntityType.
+	info := self indexInfoLabeled: aLabel entityType: anEntityType.
+	options := info options at: aProperty.
+	self assert: (options at: 'dimension') equals: 4.
+	self assert: (options at: 'similarityFunction') equals: aFunction
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexesListsCreatedIndexesAndDropRemovesThem [
+	self indexCreateSpecs do: [ :spec |
+		self assertIndexCreated: (self endpoint graphIndexCreateBy: spec on: self graphName) ].
+	self assertCreatedIndexSpecsAreListed.
+	self indexCreateSpecs do: [ :spec |
+		self assertIndexDropped: (self endpoint graphIndexDropBy: spec on: self graphName) ].
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexDropWithRemovesIndex [
+	| index |
+	index := FkGraphIndex new.
+	self indexCreateSpecs first value: index.
+	self assertIndexCreated: (self endpoint graphIndexCreateWith: index on: self graphName).
+	self assertListedProperty: 'email' type: 'RANGE' label: 'Person' entityType: 'NODE'.
+	self assertIndexDropped: (self endpoint graphIndexDropWith: index on: self graphName).
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexDropByRemovesQuotedLabel [
+	| spec |
+	spec := [ :index | index range; node: 'A)B'; props: #('p') ].
+	self assertIndexCreated: (self endpoint graphIndexCreateBy: spec on: self graphName).
+	self assertListedProperty: 'p' type: 'RANGE' label: 'A)B' entityType: 'NODE'.
+	self assertIndexDropped: (self endpoint graphIndexDropBy: spec on: self graphName).
+	self assert: (self endpoint graphIndexes: self graphName) isEmpty
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> constraintInfoOfType: aType entityType: anEntityType entityName: anEntityName [
+	^ (self endpoint graphConstraints: self graphName)
+		detect: [ :each |
+			each constraintType = aType
+				and: [ each entityType = anEntityType and: [ each entityName = anEntityName ] ] ]
+		ifNone: [ nil ]
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> waitForConstraintSettledType: aType entityType: anEntityType entityName: anEntityName [
+	"Constraint creation is asynchronous: status starts as PENDING/UNDER CONSTRUCTION before
+	becoming OPERATIONAL (or FAILED). Poll briefly rather than asserting immediately."
+
+	| info |
+	20 timesRepeat: [
+		info := self constraintInfoOfType: aType entityType: anEntityType entityName: anEntityName.
+		(info notNil and: [ info status = 'OPERATIONAL' or: [ info status = 'FAILED' ] ])
+			ifTrue: [ ^ info ].
+		(Delay forMilliseconds: 250) wait ].
+	^ info
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> assertConstraintOperationalType: aType entityType: anEntityType entityName: anEntityName properties: aPropertiesCollection [
+	| info |
+	info := self waitForConstraintSettledType: aType entityType: anEntityType entityName: anEntityName.
+	self assert: info notNil.
+	self assert: info class equals: FkGraphConstraintInfo.
+	self assert: info status equals: 'OPERATIONAL'.
+	self assertCollection: info properties asArray equals: aPropertiesCollection asArray
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsEmptyWhenGraphHasNoConstraints [
+	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
+	self assert: (self endpoint graphConstraints: self graphName) isEmpty
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> createAndAssertConstraintType: aType entityType: anEntityType entityName: anEntityName properties: aPropertiesCollection [
+	self
+		createConstraintType: aType
+		entityType: anEntityType
+		entityName: anEntityName
+		properties: aPropertiesCollection.
+	self
+		assertConstraintOperationalType: aType
+		entityType: anEntityType
+		entityName: anEntityName
+		properties: aPropertiesCollection
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsListsCreatedConstraintsOnNode [
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Person {name: ''Alice'', email: ''alice@example.com''})'.
+	self endpoint graphIndexCreateBy: [ :i | i range; node: 'Person'; props: #('email') ] on: self graphName.
+	self createAndAssertConstraintType: 'UNIQUE' entityType: 'NODE' entityName: 'Person' properties: #('email').
+	self createAndAssertConstraintType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name')
+]
+
+{ #category : 'private' }
+FkGraphEndpointTest >> createAndAssertRelationshipConstraintType: aType [
+	self
+		createAndAssertConstraintType: aType
+		entityType: 'RELATIONSHIP'
+		entityName: 'KNOWS'
+		properties: #('since')
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsListsCreatedConstraintsOnRelationship [
+	self endpoint
+		graphQuery: self graphName
+		cypher: 'CREATE (:Person)-[:KNOWS {since: 2020}]->(:Person)'.
+	self endpoint
+		graphIndexCreateBy: [ :i | i range; relationship: 'KNOWS'; props: #('since') ]
+		on: self graphName.
+	self createAndAssertRelationshipConstraintType: 'UNIQUE'.
+	self createAndAssertRelationshipConstraintType: 'MANDATORY'
 ]
 
 { #category : 'tests' }
