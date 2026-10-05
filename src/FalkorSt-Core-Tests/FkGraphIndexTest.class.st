@@ -170,6 +170,17 @@ FkGraphIndexTest >> testDropCypherForNodeVectorIndexOmitsOptions [
 ]
 
 { #category : 'tests' }
+FkGraphIndexTest >> testDropCypherForNodeVectorIndexDoesNotRequireDimension [
+	"DROP INDEX never emits OPTIONS, so dropping a vector index must not demand dimension: -
+	unlike #createCypher, which does."
+
+	| cypher |
+	cypher := self dropCypherForProperty: 'embedding' builtBy: [ :index |
+		index vector; node: 'Doc'; props: #('embedding') ].
+	self assert: cypher equals: 'DROP VECTOR INDEX FOR (n:Doc) ON (n.embedding)'
+]
+
+{ #category : 'tests' }
 FkGraphIndexTest >> testDropCypherForRelationshipCchIndex [
 	| cypher |
 	cypher := self dropCypherForProperty: 'distance' builtBy: [ :index |
