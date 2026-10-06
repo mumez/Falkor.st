@@ -3,7 +3,7 @@ I am a fluent builder for a FalkorDB CREATE INDEX statement: the index kind (ran
 or cch), the entity it covers (a node label or relationship type), the property names, and, for a
 vector index, the dimension and similarity function. I don't know which graph the index is created
 on. FkGraphEndpoint supplies that when it runs the Cypher from #createCypher. Entity/properties
-state and the common completeness check live on my superclass FkGraphEntityBuilder.
+state and the common completeness check live on my superclass FkGraphEntityOptions.
 
 Responsibility:
 - Hold the index kind and optional vector options (entity and properties are inherited)
@@ -30,7 +30,7 @@ Public API and Key Messages:
 "
 Class {
 	#name : 'FkGraphIndex',
-	#superclass : 'FkGraphEntityBuilder',
+	#superclass : 'FkGraphEntityOptions',
 	#instVars : [
 		'indexType',
 		'dimension',
@@ -142,7 +142,7 @@ FkGraphIndex >> dropCypherForProperty: aPropertyName [
 ]
 
 { #category : 'validation' }
-FkGraphIndex >> incompleteBuilderMessage [
+FkGraphIndex >> incompleteOptionsMessage [
 	^ 'FkGraphIndex requires indexType, entity (node:/relationship:), and props: to be set'
 ]
 

@@ -4,7 +4,7 @@ MANDATORY), the entity it applies to (a NODE label or RELATIONSHIP type), and th
 it covers. I don't know the graph name a constraint is applied to or dropped from - that's
 supplied separately to FkGraphEndpoint's constraint methods, since the same constraint shape can
 be built once and applied against different graphs. Entity/properties state and the common
-completeness check live on my superclass FkGraphEntityBuilder.
+completeness check live on my superclass FkGraphEntityOptions.
 
 Responsibility:
 - Hold the constraint type (entity type/name and properties are inherited)
@@ -26,7 +26,7 @@ Public API and Key Messages:
 "
 Class {
 	#name : 'FkGraphConstraint',
-	#superclass : 'FkGraphEntityBuilder',
+	#superclass : 'FkGraphEntityOptions',
 	#instVars : [
 		'constraintType'
 	],
@@ -50,7 +50,7 @@ FkGraphConstraint >> constraintType [
 ]
 
 { #category : 'validation' }
-FkGraphConstraint >> incompleteBuilderMessage [
+FkGraphConstraint >> incompleteOptionsMessage [
 	^ 'FkGraphConstraint requires constraintType (unique/mandatory), entity (node:/relationship:), and props: to be set'
 ]
 
