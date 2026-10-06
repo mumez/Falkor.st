@@ -242,6 +242,7 @@ FkGraphEndpoint >> graphConstraintCreateBy: aBlock on: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphConstraintCreateWith: aFkGraphConstraint on: graphName [
+	aFkGraphConstraint validate.
 	^ self
 		graphConstraintCreate: graphName
 		type: aFkGraphConstraint constraintType
@@ -274,6 +275,7 @@ FkGraphEndpoint >> graphConstraintDropBy: aBlock on: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphConstraintDropWith: aFkGraphConstraint on: graphName [
+	aFkGraphConstraint validate.
 	^ self
 		graphConstraintDrop: graphName
 		type: aFkGraphConstraint constraintType

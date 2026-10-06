@@ -530,6 +530,26 @@ FkGraphEndpointTest >> testGraphConstraintDropBySucceeds [
 		ensure: [ self dropConstraintIgnoringErrorsType: 'MANDATORY' entityType: 'NODE' entityName: 'Person' properties: #('name') ]
 ]
 
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintCreateWithRaisesWhenConstraintIncomplete [
+	| constraint |
+	constraint := FkGraphConstraint new.
+	constraint node: 'Person'; props: #('name').
+	self
+		should: [ self endpoint graphConstraintCreateWith: constraint on: self graphName ]
+		raise: RsError
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintDropWithRaisesWhenConstraintIncomplete [
+	| constraint |
+	constraint := FkGraphConstraint new.
+	constraint node: 'Person'; props: #('name').
+	self
+		should: [ self endpoint graphConstraintDropWith: constraint on: self graphName ]
+		raise: RsError
+]
+
 { #category : 'private' }
 FkGraphEndpointTest >> assertIndexCreated: result [
 	self assert: result class equals: FkQueryResult.

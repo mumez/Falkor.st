@@ -2,10 +2,11 @@
 I am a fluent builder for a FalkorDB CREATE INDEX statement: the index kind (range, fulltext, vector,
 or cch), the entity it covers (a node label or relationship type), the property names, and, for a
 vector index, the dimension and similarity function. I don't know which graph the index is created
-on. FkGraphEndpoint supplies that when it runs the Cypher from #createCypher.
+on. FkGraphEndpoint supplies that when it runs the Cypher from #createCypher. Entity/properties
+state and the common completeness check live on my superclass FkGraphEntityOptions.
 
 Responsibility:
-- Hold the index kind, entity, properties, and optional vector options
+- Hold the index kind and optional vector options (entity and properties are inherited)
 - Render CREATE INDEX Cypher, and DROP INDEX Cypher for a single property, via SCypher - entity and
   property names come out backtick-quoted because SCypher quotes identifiers itself
 
@@ -20,17 +21,18 @@ Public API and Key Messages:
   FalkorDB itself rejects a cch index built against a node label
 - #props: - set the property names. A cch index takes exactly one property, the edge weight
 - #dimension: / #similarityFunction: - vector OPTIONS
-- #createCypher - the CREATE INDEX statement
-- #dropCypherForProperty: - the DROP INDEX statement for one property. FalkorDB removes one property per DROP, so a multi-property spec is dropped by calling this once per property
+- #createCypher - the CREATE INDEX statement. Raises RsError invalidArguments (via #validate) when
+  indexType, entity, or properties was never set, or (vector only, create-only - DROP never emits
+  OPTIONS) when dimension: was never set
+- #dropCypherForProperty: - the DROP INDEX statement for one property. FalkorDB removes one property
+  per DROP, so a multi-property spec is dropped by calling this once per property. Raises RsError
+  invalidArguments (via #validate) when indexType, entity, or properties was never set
 "
 Class {
 	#name : 'FkGraphIndex',
-	#superclass : 'Object',
+	#superclass : 'FkGraphEntityOptions',
 	#instVars : [
 		'indexType',
-		'entityType',
-		'entityName',
-		'properties',
 		'dimension',
 		'similarityFunction'
 	],
@@ -85,16 +87,6 @@ FkGraphIndex >> dimension: anInteger [
 	^ self
 ]
 
-{ #category : 'accessing' }
-FkGraphIndex >> entityName [
-	^ entityName
-]
-
-{ #category : 'accessing' }
-FkGraphIndex >> entityType [
-	^ entityType
-]
-
 { #category : 'building' }
 FkGraphIndex >> fulltext [
 	self indexType: self class fulltextIndexType.
@@ -107,33 +99,8 @@ FkGraphIndex >> indexType [
 ]
 
 { #category : 'building' }
-FkGraphIndex >> node: aLabel [
-	self entityType: self class nodeEntityType.
-	self entityName: aLabel.
-	^ self
-]
-
-{ #category : 'accessing' }
-FkGraphIndex >> properties [
-	^ properties
-]
-
-{ #category : 'building' }
-FkGraphIndex >> props: aCollection [
-	self properties: aCollection.
-	^ self
-]
-
-{ #category : 'building' }
 FkGraphIndex >> range [
 	self indexType: self class rangeIndexType.
-	^ self
-]
-
-{ #category : 'building' }
-FkGraphIndex >> relationship: aRelType [
-	self entityType: self class relationshipEntityType.
-	self entityName: aRelType.
 	^ self
 ]
 
@@ -159,6 +126,7 @@ FkGraphIndex >> createCypher [
 	"Answer CREATE INDEX Cypher. Range omits a type keyword. Vector appends OPTIONS when set."
 
 	| cypher |
+	self validateDimensionForCreate.
 	cypher := (self cyCommand: CyCreateIndex forProperties: self properties)
 		cypherString trimRight.
 	self optionsClause ifNotNil: [ :clause | cypher := cypher , ' ' , clause ].
@@ -173,6 +141,16 @@ FkGraphIndex >> dropCypherForProperty: aPropertyName [
 		cypherString trimRight
 ]
 
+{ #category : 'validation' }
+FkGraphIndex >> incompleteOptionsMessage [
+	^ 'FkGraphIndex requires indexType, entity (node:/relationship:), and props: to be set'
+]
+
+{ #category : 'validation' }
+FkGraphIndex >> kindIsMissing [
+	^ self indexType isNil
+]
+
 { #category : 'private' }
 FkGraphIndex >> applyIndexTypeTo: aCyIndexCommand [
 	"Range has no type keyword; every other kind uses its uppercased name (FULLTEXT, VECTOR, CCH)."
@@ -184,6 +162,7 @@ FkGraphIndex >> applyIndexTypeTo: aCyIndexCommand [
 { #category : 'private' }
 FkGraphIndex >> cyCommand: aCyIndexCommandClass forProperties: aCollection [
 	| entity command |
+	self validate.
 	entity := self entityCyObject.
 	command := aCyIndexCommandClass
 		target: entity
@@ -203,16 +182,6 @@ FkGraphIndex >> entityCyObject [
 	^ (CyNode empty)
 		- (self entityVariableName asCypherIdentifier rel: { self entityName })
 		- CyNode empty
-]
-
-{ #category : 'private' }
-FkGraphIndex >> entityName: aString [
-	entityName := aString
-]
-
-{ #category : 'private' }
-FkGraphIndex >> entityType: aString [
-	entityType := aString
 ]
 
 { #category : 'private' }
@@ -240,11 +209,6 @@ FkGraphIndex >> optionsClause [
 ]
 
 { #category : 'private' }
-FkGraphIndex >> properties: aCollection [
-	properties := aCollection
-]
-
-{ #category : 'private' }
 FkGraphIndex >> quotedString: aString [
 	"Single-quote a Cypher string literal, doubling any embedded single quote."
 
@@ -259,4 +223,15 @@ FkGraphIndex >> setDimension: anInteger [
 { #category : 'private' }
 FkGraphIndex >> setSimilarityFunction: aString [
 	similarityFunction := aString
+]
+
+{ #category : 'private' }
+FkGraphIndex >> validateDimensionForCreate [
+	"Vector OPTIONS, including dimension:, are only ever rendered by #createCypher - DROP INDEX
+	never emits them - so this check must not run on the #dropCypherForProperty: path."
+
+	(self indexType = self class vectorIndexType and: [ self dimension isNil ])
+		ifTrue: [
+			^ self signalInvalidArguments:
+				'FkGraphIndex requires dimension: to be set for a vector index' ]
 ]
