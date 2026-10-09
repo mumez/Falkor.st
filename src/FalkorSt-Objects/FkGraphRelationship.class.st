@@ -8,6 +8,8 @@ Responsibility:
 - Delegate #type, #startNodeId, #endNodeId to my wrapped FkRelationship
 - Supply the CyRelationship pattern element (#matchElementNamed:) that FkGraphObject's #delete /
   #propertyAt:put: / #reload use to match myself by id
+- Override #baseQueryMatching:withId: to seek my start node by id first (FalkorDB has no
+  relationship-by-id seek - see Implementation Points)
 - Fetch my start/end/head/tail node as an FkGraphNode via my FkGraphDb's #nodeAt:
 - Hold an optional #navigationOriginNodeId - the id of the node a path or one-hop query was fetched
   from - used to resolve #ownNode/#otherNode relative to that origin
@@ -41,6 +43,18 @@ Implementation Points:
   #relationshipAt: and the create*/merge*RelationshipTyped: factories have no traversal anchor, so
   relationships they answer always have a nil origin; only relationships reached through a one-hop
   path/relationship query anchored at one node (FkGraphNode's relationship-navigation API) carry one.
+- #baseQueryMatching:withId: - FalkorDB has no relationship-by-id seek, so FkGraphObject's default
+  (MATCH element WHERE id(n) = x) always scans every relationship matching the pattern. I override
+  it to seek my own start node by id first - MATCH (s) WHERE id(s) = startNodeId WITH s MATCH
+  (s)-[n]-(e) WHERE id(n) = x - which the FalkorDB planner turns into a NodeByIdSeek on s followed
+  by a Conditional Traverse to n, bounded by s's degree rather than a full relationship scan;
+  verified against a real instance for #delete/#propertyAt:put:/#reload (NodeByIdSeek -> Conditional
+  Traverse, correct results). The WITH works around the same FalkorDB 6.0.1 planner bug documented
+  on FkGraphDb's #oneHopPathsQueryFor:... and in Performance.md: without it, the first MATCH's
+  WHERE is silently dropped once the second MATCH traverses from the same node. Using both
+  endpoints' ids (MATCH (e) WHERE id(e) = endNodeId too) turns the traversal into an Expand Into
+  instead of a Conditional Traverse - also verified, but not implemented, since seeking the start
+  node alone already removes the full scan with no extra query-building complexity.
 "
 Class {
 	#name : 'FkGraphRelationship',
@@ -75,6 +89,27 @@ FkGraphRelationship >> matchElementNamed: anIdentifier [
 	s := 's' asCypherIdentifier.
 	e := 'e' asCypherIdentifier.
 	^ CyRelationship start: s end: e name: anIdentifier
+]
+
+{ #category : 'private' }
+FkGraphRelationship >> baseQueryMatching: element withId: id [
+	"FalkorDB has no relationship-by-id seek, so a plain 'MATCH (s)-[n]-(e) WHERE id(n) = x' always
+	scans every relationship of that pattern. I know my own start node's id already, so I seek that
+	node by id first instead - MATCH (s) WHERE id(s) = startNodeId WITH s MATCH (s)-[n]-(e) WHERE
+	id(n) = x - turning the scan into a NodeByIdSeek on s followed by a Conditional Traverse to n,
+	bounded by s's degree rather than the whole graph's relationship count. The WITH is required:
+	without it, FalkorDB's planner silently drops the first MATCH's WHERE once the second MATCH
+	traverses from the same node (see FkGraphDb's oneHopPathsQueryFor:... comment and Performance.md
+	for the same bug). element must reuse the identifier 's' for #matchElementNamed:'s pattern to
+	bind to the node seeked here."
+
+	| s query |
+	s := 's' asCypherIdentifier.
+	query := CyQuery match: s asNode where: (s getId equals: self startNodeId).
+	query addWith: s.
+	query addMatch: element.
+	query addWhere: (id getId equals: self id).
+	^ query
 ]
 
 { #category : 'accessing' }
