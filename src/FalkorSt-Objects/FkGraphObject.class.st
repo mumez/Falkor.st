@@ -10,7 +10,8 @@ Responsibility:
 - Run a Cypher SET/DELETE against my FkGraphDb for #propertyAt:put: / #delete, then reload the
   wrapped raw value from FalkorDB so local state never diverges from what was actually committed
 - Require subclasses to supply the CyNode/CyRelationship pattern element used to match myself by id
-  (#matchElementNamed:) - everything else about the match/set/delete/return Cypher is generic
+  (#cypherElementWithIdentifier:) - everything else about the match/set/delete/return Cypher is
+  generic
 - Signal an FkGraphDbError (#NoSuchObject) instead of failing with SubscriptOutOfBounds when
   #reload's MATCH-by-id finds no record (e.g. the object was deleted by another session)
 - Track whether #delete has been sent to me locally (#isDeleted) and signal an FkGraphDbError
@@ -38,14 +39,15 @@ Public API and Key Messages:
 - #name / #name: - shortcut accessors for the 'name' property
 
 Implementation Points:
-- #matchElementNamed: is subclassResponsibility - it answers the CyNode/CyRelationship built with
-  the given identifier that #delete/#propertyAt:put:/#reload match myself by id through.
-- #baseQueryMatching:withId: is the other subclassResponsibility-adjacent hook (a plain overridable
-  method, not subclassResponsibility, since my own default - MATCH element WHERE id(id) = self id -
-  already works for FkGraphNode): it answers the CyQuery whose MATCH/WHERE (and WITH, if needed)
-  bind element/id to myself by id, before #delete/#propertyAt:put:/#changeProperties:using:/#reload
-  add their own DELETE/SET/RETURN. FkGraphRelationship overrides it because FalkorDB has no
-  relationship-by-id seek - see its comment.
+- #cypherElementWithIdentifier: is subclassResponsibility - it answers the CyNode/CyRelationship
+  built with the given identifier that #delete/#propertyAt:put:/#reload match myself by id through.
+- #baseQueryMatching:withIdentifier: is the other subclassResponsibility-adjacent hook (a plain
+  overridable method, not subclassResponsibility, since my own default - MATCH element WHERE
+  id(anIdentifier) = self id - already works for FkGraphNode): it answers the CyQuery whose
+  MATCH/WHERE (and WITH, if needed) bind element/anIdentifier to myself by id, before
+  #delete/#propertyAt:put:/#changeProperties:using:/#reload add their own DELETE/SET/RETURN.
+  FkGraphRelationship overrides it because FalkorDB has no relationship-by-id seek - see its
+  comment.
 - #properties:/#mergeProperties:/#removePropertyAt: share their match/where/run/reload skeleton
   through the private #changeProperties:using: helper - mirrors FkGraphNode's #changeLabels:using:.
   The block passed in appends the SET/REMOVE statement to the query itself (query addSet:/addRemove:),
@@ -92,8 +94,8 @@ FkGraphObject >> db: anObject [
 FkGraphObject >> delete [
 	| n element query |
 	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
-	query := self baseQueryMatching: element withId: n.
+	element := self cypherElementWithIdentifier: n.
+	query := self baseQueryMatching: element withIdentifier: n.
 	query addDelete: element.
 	self db runCypher: query.
 	isDeleted := true
@@ -145,20 +147,20 @@ FkGraphObject >> name: aString [
 ]
 
 { #category : 'private' }
-FkGraphObject >> matchElementNamed: anIdentifier [
+FkGraphObject >> cypherElementWithIdentifier: anIdentifier [
 	^ self subclassResponsibility
 ]
 
 { #category : 'private' }
-FkGraphObject >> baseQueryMatching: element withId: id [
+FkGraphObject >> baseQueryMatching: element withIdentifier: anIdentifier [
 	"Answers a CyQuery whose MATCH/WHERE (and, for subclasses that need it, WITH) already bind
-	element/id to myself by id - everything #delete/#propertyAt:put:/#changeProperties:using:/
-	#reload need before adding their own DELETE/SET/RETURN. A node can be matched/seeked by id
-	directly (MATCH (n) WHERE id(n) = x), but FalkorDB has no relationship-by-id seek, so
+	element/anIdentifier to myself by id - everything #delete/#propertyAt:put:/#changeProperties:
+	using:/#reload need before adding their own DELETE/SET/RETURN. A node can be matched/seeked by
+	id directly (MATCH (n) WHERE id(n) = x), but FalkorDB has no relationship-by-id seek, so
 	FkGraphRelationship overrides this to seek its start node by id first instead - see its
 	comment."
 
-	^ CyQuery match: element where: (id getId equals: self id)
+	^ CyQuery match: element where: (anIdentifier getId equals: self id)
 ]
 
 { #category : 'accessing' }
@@ -185,8 +187,8 @@ FkGraphObject >> propertyAt: key put: value [
 	| n element query |
 	self checkIsDeleted.
 	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
-	query := self baseQueryMatching: element withId: n.
+	element := self cypherElementWithIdentifier: n.
+	query := self baseQueryMatching: element withIdentifier: n.
 	query addSet: { (n @ key) to: value }.
 	self db runCypher: query.
 	self reload
@@ -197,8 +199,8 @@ FkGraphObject >> changeProperties: propsOrNil using: aBlock [
 	| n element query |
 	self checkIsDeleted.
 	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
-	query := self baseQueryMatching: element withId: n.
+	element := self cypherElementWithIdentifier: n.
+	query := self baseQueryMatching: element withIdentifier: n.
 	aBlock value: query value: n.
 	propsOrNil
 		ifNil: [ self db runCypher: query ]
@@ -235,8 +237,8 @@ FkGraphObject >> removePropertyAt: key [
 FkGraphObject >> reload [
 	| n element query result |
 	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
-	query := self baseQueryMatching: element withId: n.
+	element := self cypherElementWithIdentifier: n.
+	query := self baseQueryMatching: element withIdentifier: n.
 	query addReturn: n.
 	result := self db runCypher: query.
 	rawGraphObject := result oneValueIfNone: [

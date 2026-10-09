@@ -51,11 +51,11 @@ result counts/existence are correct, including when the start node id doesn't ex
 Fixed in: SCypher v1.4.0 (removes the redundant outer `WHERE` parentheses) + this falkor.st change
 (splits `oneHopPathsQueryFor:...` into its own `MATCH`/`WITH`/`MATCH` form).
 
-### Workaround: `FkGraphRelationship>>baseQueryMatching:withId:` (used by `reload`, `delete`,
+### Workaround: `FkGraphRelationship>>baseQueryMatching:withIdentifier:` (used by `reload`, `delete`,
 `propertyAt:put:`, `changeProperties:using:`/`properties:`/`mergeProperties:`/`removePropertyAt:`,
 all inherited from `FkGraphObject`)
 
-`FkGraphObject`'s default `#baseQueryMatching:withId:` (`MATCH element WHERE id(n) = x`) is fine for
+`FkGraphObject`'s default `#baseQueryMatching:withIdentifier:` (`MATCH element WHERE id(n) = x`) is fine for
 `FkGraphNode` - a plain node-by-id seek - but FalkorDB has no relationship-by-id seek, so the same
 form on a relationship pattern (`MATCH (s)-[n]-(e) WHERE id(n) = x`) always scans every
 relationship matching the pattern. `FkGraphRelationship` overrides the hook to seek its own start

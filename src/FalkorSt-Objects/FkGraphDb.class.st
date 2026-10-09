@@ -537,7 +537,7 @@ FkGraphDb >> oneHopPathsQueryFor: typeOrTypes direction: direction from: startNo
 	query addWith: s.
 	query addMatch: path.
 	andWhere := whereClauseBuilder value: s value: r value: e.
-	query addWhere: andWhere.
+	andWhere ifNotNil: [ query addWhere: andWhere ].
 	processBlock ifNotNil: [ p := processBlock value: p ].
 	query addReturn: p in: returnBlock.
 	^ query
