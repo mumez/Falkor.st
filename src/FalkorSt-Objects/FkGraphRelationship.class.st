@@ -6,8 +6,10 @@ FkGraphObject - I only add what's specific to relationships.
 
 Responsibility:
 - Delegate #type, #startNodeId, #endNodeId to my wrapped FkRelationship
-- Supply the CyRelationship pattern element (#matchElementNamed:) that FkGraphObject's #delete /
-  #propertyAt:put: / #reload use to match myself by id
+- Supply the CyRelationship pattern element (#cypherElementWithIdentifier:) that FkGraphObject's
+  #delete / #propertyAt:put: / #reload use to match myself by id
+- Override #baseQueryMatching:withIdentifier: to seek my start node by id first (FalkorDB has no
+  relationship-by-id seek - see Implementation Points)
 - Fetch my start/end/head/tail node as an FkGraphNode via my FkGraphDb's #nodeAt:
 - Hold an optional #navigationOriginNodeId - the id of the node a path or one-hop query was fetched
   from - used to resolve #ownNode/#otherNode relative to that origin
@@ -41,6 +43,11 @@ Implementation Points:
   #relationshipAt: and the create*/merge*RelationshipTyped: factories have no traversal anchor, so
   relationships they answer always have a nil origin; only relationships reached through a one-hop
   path/relationship query anchored at one node (FkGraphNode's relationship-navigation API) carry one.
+- #baseQueryMatching:withIdentifier: - seeks my start node by id first instead of scanning every
+  relationship (FalkorDB has no relationship-by-id seek) - see docs/Performance-workaround.md.
+- #startNodeCypherIdentifier - the single source of truth for the start node's Cypher variable,
+  shared by #cypherElementWithIdentifier: and #baseQueryMatching:withIdentifier: so the two can't
+  bind to different variables.
 "
 Class {
 	#name : 'FkGraphRelationship',
@@ -70,11 +77,31 @@ FkGraphRelationship >> endNodeId [
 ]
 
 { #category : 'private' }
-FkGraphRelationship >> matchElementNamed: anIdentifier [
-	| s e |
-	s := 's' asCypherIdentifier.
+FkGraphRelationship >> cypherElementWithIdentifier: anIdentifier [
+	| e |
 	e := 'e' asCypherIdentifier.
-	^ CyRelationship start: s end: e name: anIdentifier
+	^ CyRelationship start: self startNodeCypherIdentifier end: e name: anIdentifier
+]
+
+{ #category : 'private' }
+FkGraphRelationship >> startNodeCypherIdentifier [
+	"Shared with #baseQueryMatching:withIdentifier: so both bind to the same variable - see
+	docs/Performance-workaround.md."
+
+	^ 's' asCypherIdentifier
+]
+
+{ #category : 'private' }
+FkGraphRelationship >> baseQueryMatching: element withIdentifier: anIdentifier [
+	"Seeks my start node by id before matching element - see docs/Performance-workaround.md."
+
+	| s query |
+	s := self startNodeCypherIdentifier.
+	query := CyQuery match: s asNode where: (s getId equals: self startNodeId).
+	query addWith: s.
+	query addMatch: element.
+	query addWhere: (anIdentifier getId equals: self id).
+	^ query
 ]
 
 { #category : 'accessing' }

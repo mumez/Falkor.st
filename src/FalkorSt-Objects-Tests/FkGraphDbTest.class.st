@@ -831,6 +831,50 @@ FkGraphDbTest >> testOneHopPathsTypedReturnInNarrowedToEndNodeAnswersWrappedEndN
 ]
 
 { #category : 'tests' }
+FkGraphDbTest >> testOneHopPathsTypedCountsOnlyPathsFromTheGivenStartNode [
+	"Guards against the FalkorDB planner bug where a later MATCH traversing from the same node
+	silently drops the earlier MATCH's WHERE id(s) = x when there is no WITH in between: without
+	the WITH, this would answer paths from every KNOWS-Person node in the graph, not just alice's."
+
+	| db alice carol dave paths |
+	db := self db.
+	alice := (self createAliceKnowsBobIn: db) first.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	dave := db createNodeLabeled: 'Person' properties: { 'name' -> 'Dave' }.
+	db createOutRelationshipTyped: 'KNOWS' fromNodeId: carol id toNodeId: dave id properties: #().
+	paths := db
+		oneHopPathsTyped: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ]
+		returning: [ :path | path ].
+	self assert: paths size equals: 1.
+	self assert: paths first startNode id equals: alice id
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testOneHopPathsQueryForUsesNodeByIdSeekToFindTheStartNode [
+	| db alice query plan |
+	db := self db.
+	alice := (self createAliceKnowsBobIn: db) first.
+	query := db
+		oneHopPathsQueryFor: 'KNOWS'
+		direction: #out
+		from: alice id
+		havingAll: #()
+		endNodeWithLabels: #('Person')
+		havingAll: #()
+		whereIn: [ :s :r :e | nil ]
+		pathProcessIn: nil
+		returnIn: nil.
+	plan := db explain: query.
+	self assert: (plan anySatisfy: [ :line | line includesSubstring: 'NodeByIdSeek' ])
+]
+
+{ #category : 'tests' }
 FkGraphDbTest >> testAllLabelsAnswersEveryDistinctLabelInTheGraph [
 	| db labels |
 	db := self db.

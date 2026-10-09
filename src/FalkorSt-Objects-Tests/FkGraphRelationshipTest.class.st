@@ -175,3 +175,35 @@ FkGraphRelationshipTest >> testRemovePropertyAtRemovesOneKey [
 	rel removePropertyAt: 'since'.
 	self assert: (rel propertyAt: 'since') isNil
 ]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testPropertyAtPutOnlyAffectsTheMatchingRelationshipWhenAnotherSharesTheStartNode [
+	"Guards against seeking the wrong relationship once there is more than one edge out of the
+	same start node - a regression here would mean #baseQueryMatching:withIdentifier: built a
+	MATCH that no longer narrows down to id(n) = self id after seeking the start node."
+
+	| db alice bob carol rel other |
+	db := self db.
+	alice := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	rel := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	other := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: carol id properties: #().
+	rel propertyAt: 'weight' put: 5.
+	self assert: (rel propertyAt: 'weight') equals: 5.
+	self assert: ((db relationshipAt: other id) propertyAt: 'weight') isNil
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testBaseQueryMatchingWithIdentifierUsesNodeByIdSeekOnTheStartNode [
+	| db rel n element query plan |
+	db := self db.
+	self createAliceKnowsBobIn: db.
+	rel := (db relationshipsTyped: 'KNOWS') first.
+	n := 'n' asCypherIdentifier.
+	element := rel cypherElementWithIdentifier: n.
+	query := rel baseQueryMatching: element withIdentifier: n.
+	query addReturn: n.
+	plan := db explain: query.
+	self assert: (plan anySatisfy: [ :line | line includesSubstring: 'NodeByIdSeek' ])
+]
