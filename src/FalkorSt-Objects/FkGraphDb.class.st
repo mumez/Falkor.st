@@ -169,12 +169,8 @@ Implementation Points:
 - #existsOneHopPathsTyped:... and the returnIn:-taking #oneHopPathsTyped:...returnIn:returning:
   mirror N4GraphDb (../Neo4reSt, reference-only): both delegate their query-building to the
   private #oneHopPathsQueryResultFor:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:
-  pathProcessIn:returnIn:, which builds a MATCH (s) WHERE id(s) = x / WITH s / MATCH p = ... query
-  by hand (rather than SCypher's single-MATCH matchPathWithRelationshipsOfTypes:... shortcut) so
-  the start node is still found via NodeByIdSeek once the pattern has an end-node label or a
-  whereIn clause - see that method's comment and docs/Performance-workaround.md for the FalkorDB 6.0.1 planner
-  limitations this works around. The direction-block selection and query construction live in
-  that one place so both callers stay in sync. #existsOneHopPathsTyped:... passes
+  pathProcessIn:returnIn: - see docs/Performance-workaround.md for why it builds its MATCH/WITH/
+  MATCH by hand instead of using SCypher's single-MATCH shortcut. #existsOneHopPathsTyped:... passes
   pathProcessIn: [:path | path count > 0] and returnIn: [:r | r] so FalkorDB answers a bare
   Boolean as the first (and only) record value. #oneHopPathsTyped:...returnIn:returning: passes
   pathProcessIn: nil and exposes returnIn: to the caller instead, relying on the query builder's
@@ -514,11 +510,7 @@ FkGraphDb >> oneHopPathsTyped: typeOrTypes direction: direction from: startNodeI
 { #category : 'private' }
 FkGraphDb >> oneHopPathsQueryFor: typeOrTypes direction: direction from: startNodeId havingAll: relProps endNodeWithLabels: labels havingAll: endNodeProps whereIn: whereClauseBuilder pathProcessIn: processBlock returnIn: returnBlock [
 	"Seeks the start node by id in its own MATCH/WHERE, then WITH s before traversing from it in a
-	second MATCH - the single-MATCH form (id(s) = x ANDed with the rest of the WHERE) makes FalkorDB
-	6.0.1 fall back to a full/label scan once the pattern has an end-node label or a whereIn clause,
-	and WITH is required to work around a FalkorDB planner bug where a later MATCH traversing from
-	the same node silently drops the earlier MATCH's WHERE. See the class comment and the kanban
-	issue (1791471566989) for the full investigation. Split out from
+	second MATCH - see docs/Performance-workaround.md for why. Split out from
 	#oneHopPathsQueryResultFor:...pathProcessIn:returnIn: so tests can #explain: the built query
 	without running it."
 

@@ -46,8 +46,7 @@ Implementation Points:
   id(anIdentifier) = self id - already works for FkGraphNode): it answers the CyQuery whose
   MATCH/WHERE (and WITH, if needed) bind element/anIdentifier to myself by id, before
   #delete/#propertyAt:put:/#changeProperties:using:/#reload add their own DELETE/SET/RETURN.
-  FkGraphRelationship overrides it because FalkorDB has no relationship-by-id seek - see its
-  comment.
+  FkGraphRelationship overrides it - see docs/Performance-workaround.md.
 - #properties:/#mergeProperties:/#removePropertyAt: share their match/where/run/reload skeleton
   through the private #changeProperties:using: helper - mirrors FkGraphNode's #changeLabels:using:.
   The block passed in appends the SET/REMOVE statement to the query itself (query addSet:/addRemove:),
