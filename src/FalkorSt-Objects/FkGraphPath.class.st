@@ -2,7 +2,7 @@
 I am the high-level counterpart to FkPath: a decoded path plus the FkGraphDb it came from. I mirror
 SgPath (../SCypherGraph, reference-only), but unlike FkGraphNode/FkGraphRelationship I am not an
 FkGraphObject subclass - a path has no id, no #propertyAt:put:, and nothing to DELETE, so
-FkGraphObject's CRUD API (and its subclassResponsibility #matchElementNamed:) does not apply to me.
+FkGraphObject's CRUD API (and its subclassResponsibility #cypherElementWithIdentifier:) does not apply to me.
 
 Responsibility:
 - Hold a decoded FkPath together with the FkGraphDb it was fetched through

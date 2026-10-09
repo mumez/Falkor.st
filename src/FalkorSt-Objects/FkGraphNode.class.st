@@ -112,7 +112,7 @@ FkGraphNode >> changeLabels: labels using: addStatementBlock [
 	| n element query |
 	self checkIsDeleted.
 	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
+	element := self cypherElementWithIdentifier: n.
 	query := CyQuery match: element where: (n getId equals: self id).
 	addStatementBlock value: query value: (n labels: labels).
 	self db runCypher: query.
@@ -123,7 +123,7 @@ FkGraphNode >> changeLabels: labels using: addStatementBlock [
 FkGraphNode >> labelsFromDb [
 	| n element query result |
 	n := 'n' asCypherIdentifier.
-	element := self matchElementNamed: n.
+	element := self cypherElementWithIdentifier: n.
 	query := CyQuery match: element where: (n getId equals: self id) return: n labels.
 	result := self db runReadOnlyCypher: query.
 	^ result oneValueIfNone: [
@@ -282,7 +282,7 @@ FkGraphNode >> labels [
 ]
 
 { #category : 'private' }
-FkGraphNode >> matchElementNamed: anIdentifier [
+FkGraphNode >> cypherElementWithIdentifier: anIdentifier [
 	^ CyNode name: anIdentifier
 ]
 
