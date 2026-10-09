@@ -172,7 +172,7 @@ Implementation Points:
   pathProcessIn:returnIn:, which builds a MATCH (s) WHERE id(s) = x / WITH s / MATCH p = ... query
   by hand (rather than SCypher's single-MATCH matchPathWithRelationshipsOfTypes:... shortcut) so
   the start node is still found via NodeByIdSeek once the pattern has an end-node label or a
-  whereIn clause - see that method's comment and Performance.md for the FalkorDB 6.0.1 planner
+  whereIn clause - see that method's comment and docs/Performance-workaround.md for the FalkorDB 6.0.1 planner
   limitations this works around. The direction-block selection and query construction live in
   that one place so both callers stay in sync. #existsOneHopPathsTyped:... passes
   pathProcessIn: [:path | path count > 0] and returnIn: [:r | r] so FalkorDB answers a bare

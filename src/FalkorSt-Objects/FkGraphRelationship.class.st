@@ -50,7 +50,7 @@ Implementation Points:
   by a Conditional Traverse to n, bounded by s's degree rather than a full relationship scan;
   verified against a real instance for #delete/#propertyAt:put:/#reload (NodeByIdSeek -> Conditional
   Traverse, correct results). The WITH works around the same FalkorDB 6.0.1 planner bug documented
-  on FkGraphDb's #oneHopPathsQueryFor:... and in Performance.md: without it, the first MATCH's
+  on FkGraphDb's #oneHopPathsQueryFor:... and in docs/Performance-workaround.md: without it, the first MATCH's
   WHERE is silently dropped once the second MATCH traverses from the same node. Using both
   endpoints' ids (MATCH (e) WHERE id(e) = endNodeId too) turns the traversal into an Expand Into
   instead of a Conditional Traverse - also verified, but not implemented, since seeking the start
@@ -99,7 +99,7 @@ FkGraphRelationship >> baseQueryMatching: element withId: id [
 	id(n) = x - turning the scan into a NodeByIdSeek on s followed by a Conditional Traverse to n,
 	bounded by s's degree rather than the whole graph's relationship count. The WITH is required:
 	without it, FalkorDB's planner silently drops the first MATCH's WHERE once the second MATCH
-	traverses from the same node (see FkGraphDb's oneHopPathsQueryFor:... comment and Performance.md
+	traverses from the same node (see FkGraphDb's oneHopPathsQueryFor:... comment and docs/Performance-workaround.md
 	for the same bug). element must reuse the identifier 's' for #matchElementNamed:'s pattern to
 	bind to the node seeked here."
 
