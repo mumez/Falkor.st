@@ -95,7 +95,7 @@ FkGraphObject >> delete [
 	n := 'n' asCypherIdentifier.
 	element := self cypherElementWithIdentifier: n.
 	query := self baseQueryMatching: element withIdentifier: n.
-	query addDelete: element.
+	query addDelete: n.
 	self db runCypher: query.
 	isDeleted := true
 ]

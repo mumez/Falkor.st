@@ -195,6 +195,22 @@ FkGraphRelationshipTest >> testPropertyAtPutOnlyAffectsTheMatchingRelationshipWh
 ]
 
 { #category : 'tests' }
+FkGraphRelationshipTest >> testDeleteOnlyRemovesTheMatchingRelationshipWhenAnotherSharesTheStartNode [
+	| db alice bob carol rel other |
+	db := self db.
+	alice := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	rel := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	other := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: carol id properties: #().
+	rel delete.
+	self assert: rel isDeleted.
+	self assert: (db relationshipAt: rel id) isNil.
+	self assert: (db relationshipAt: other id) notNil.
+	self assert: (db countNodesLabeled: 'Person') equals: 3
+]
+
+{ #category : 'tests' }
 FkGraphRelationshipTest >> testBaseQueryMatchingWithIdentifierUsesNodeByIdSeekOnTheStartNode [
 	| db rel n element query plan |
 	db := self db.
