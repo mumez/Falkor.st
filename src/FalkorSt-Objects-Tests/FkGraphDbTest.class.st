@@ -18,6 +18,7 @@ Coverage:
 - graph-object-api spec: ""Bulk-deleting nodes, relationships, or the whole graph""
 - graph-object-api spec: ""Finding orphaned nodes""
 - index/constraint/procedure facades delegating to FkGraphEndpoint for this graph
+- #printOn: showing the graph name and, once a stick is set, its target URL and status
 "
 Class {
 	#name : 'FkGraphDbTest',
@@ -1153,4 +1154,19 @@ FkGraphDbTest >> testAllPropertyKeysAnswersEveryDistinctPropertyKeyInTheGraph [
 	db := self db.
 	db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice'. 'age' -> 30 }.
 	self assert: db allPropertyKeys asSet equals: #('name' 'age') asSet
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testPrintStringShowsNameTargetUrlAndStickStatus [
+	self
+		assert: self db printString
+		equals: 'a FkGraphDb(' , self graphName , ' ' , self class urlString , ' connected)'
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testPrintStringWithoutStickShowsOnlyNameAndDoesNotConnect [
+	| db |
+	db := FkGraphDb named: 'social'.
+	self assert: db printString equals: 'a FkGraphDb(social)'.
+	self assert: (db instVarNamed: 'stick') isNil
 ]

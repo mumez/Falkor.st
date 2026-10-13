@@ -17,6 +17,7 @@ Coverage:
 - graph-object-api spec: ""Creating/merging an outgoing relationship to another node""
 - graph-object-api spec: ""Collecting the distinct relationship types of a node""
 - graph-object-api spec: ""Adding/removing labels and re-querying them from the database""
+- #printOn: showing the wrapped node's id
 "
 Class {
 	#name : 'FkGraphNodeTest',
@@ -496,4 +497,11 @@ FkGraphNodeTest >> testNameColonUpdatesTheNamePropertyValue [
 	graphNode name: 'NewName'.
 	self assert: graphNode name equals: 'NewName'.
 	self assert: (graphNode propertyAt: 'name') equals: 'NewName'
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testPrintStringShowsTheId [
+	| graphNode |
+	graphNode := FkGraphNode on: (FkNode id: 42 labels: #() properties: Dictionary new) in: nil.
+	self assert: graphNode printString equals: 'a FkGraphNode(42)'
 ]

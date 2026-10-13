@@ -830,6 +830,21 @@ FkGraphDb >> name [
 	^ name ifNil: [ self defaultName ]
 ]
 
+{ #category : 'printing' }
+FkGraphDb >> printOn: aStream [
+	"Read the stick variable directly - #stick would lazily create and connect one just for printing"
+
+	super printOn: aStream.
+	aStream nextPut: $(; nextPutAll: self name asString.
+	stick ifNotNil: [ :aStick |
+		aStream
+			space;
+			nextPutAll: aStick targetUrl asString;
+			space;
+			nextPutAll: aStick statusString ].
+	aStream nextPut: $)
+]
+
 { #category : 'private' }
 FkGraphDb >> defaultName [
 	^ 'default'

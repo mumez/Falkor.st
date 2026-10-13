@@ -162,6 +162,15 @@ FkGraphObject >> baseQueryMatching: element withIdentifier: anIdentifier [
 	^ CyQuery match: element where: (anIdentifier getId equals: self id)
 ]
 
+{ #category : 'printing' }
+FkGraphObject >> printOn: aStream [
+	super printOn: aStream.
+	aStream
+		nextPut: $(;
+		print: (self rawGraphObject ifNotNil: [ :raw | raw id ]);
+		nextPut: $)
+]
+
 { #category : 'accessing' }
 FkGraphObject >> properties [
 	self checkIsDeleted.
