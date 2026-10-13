@@ -166,7 +166,7 @@ FkGraphObject >> baseQueryMatching: element withIdentifier: anIdentifier [
 FkGraphObject >> printOn: aStream [
 	super printOn: aStream.
 	aStream
-		nextPut: $(;
+		nextPutAll: '(id:';
 		print: (self rawGraphObject ifNotNil: [ :raw | raw id ]);
 		nextPut: $)
 ]

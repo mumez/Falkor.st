@@ -503,5 +503,5 @@ FkGraphNodeTest >> testNameColonUpdatesTheNamePropertyValue [
 FkGraphNodeTest >> testPrintStringShowsTheId [
 	| graphNode |
 	graphNode := FkGraphNode on: (FkNode id: 42 labels: #() properties: Dictionary new) in: nil.
-	self assert: graphNode printString equals: 'a FkGraphNode(42)'
+	self assert: graphNode printString equals: 'a FkGraphNode(id:42)'
 ]
