@@ -1,7 +1,6 @@
 "
 I am one row of CALL db.constraints(): the constraints FalkorDB reports for a single label or
-relationship type. I am produced by FkGraphEndpoint>>graphConstraints:; I never talk to FalkorDB
-myself.
+relationship type. I am built from a db.constraints() result; I never talk to FalkorDB myself.
 
 Responsibility:
 - Expose the constraint type, entity type/name, properties, and status from one db.constraints()
@@ -10,11 +9,12 @@ Responsibility:
   silently lost behind a nil accessor
 
 Collaborators:
-- FkGraphEndpoint: builds instances of me from mapped db.constraints() records
+- FkQueryResult: the CALL db.constraints() result whose mapped records I am built from
 
 Public API and Key Messages:
 - #constraintType / #entityType / #entityName / #properties / #status
-- FkGraphConstraintInfo class >> fromRecord: - build one instance from a mapped record
+- FkGraphConstraintInfo class >> allFromQueryResult: - build one instance per record of a
+  db.constraints() result
 "
 Class {
 	#name : 'FkGraphConstraintInfo',
@@ -25,6 +25,11 @@ Class {
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
 }
+
+{ #category : 'instance creation' }
+FkGraphConstraintInfo class >> allFromQueryResult: aFkQueryResult [
+	^ aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]
+]
 
 { #category : 'instance creation' }
 FkGraphConstraintInfo class >> fromRecord: aDictionary [

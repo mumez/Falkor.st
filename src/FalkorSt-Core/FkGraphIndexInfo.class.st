@@ -1,8 +1,8 @@
 "
 I am one row of CALL db.indexes(): the indexes FalkorDB reports for a single label or
 relationship type. Properties on that entity can have different kinds, so #types and #options are
-dictionaries keyed by property name. I am produced by FkGraphEndpoint>>graphIndexes:; I never talk
-to FalkorDB myself.
+dictionaries keyed by property name. I am built from a db.indexes() result; I never talk to
+FalkorDB myself.
 
 Responsibility:
 - Expose the label, properties, per-property kinds and options, language, stopwords, entity type,
@@ -11,11 +11,12 @@ Responsibility:
   silently lost behind a nil accessor
 
 Collaborators:
-- FkGraphEndpoint: builds instances of me from mapped db.indexes() records
+- FkQueryResult: the CALL db.indexes() result whose mapped records I am built from
 
 Public API and Key Messages:
 - #label / #properties / #types / #options / #language / #stopwords / #entityType / #status
-- FkGraphIndexInfo class >> fromRecord: - build one instance from a mapped record
+- FkGraphIndexInfo class >> allFromQueryResult: - build one instance per record of a db.indexes()
+  result
 "
 Class {
 	#name : 'FkGraphIndexInfo',
@@ -26,6 +27,11 @@ Class {
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
 }
+
+{ #category : 'instance creation' }
+FkGraphIndexInfo class >> allFromQueryResult: aFkQueryResult [
+	^ aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]
+]
 
 { #category : 'instance creation' }
 FkGraphIndexInfo class >> fromRecord: aDictionary [
