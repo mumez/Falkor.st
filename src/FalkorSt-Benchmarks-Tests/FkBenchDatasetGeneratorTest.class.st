@@ -39,6 +39,24 @@ FkBenchDatasetGeneratorTest >> testCountsFollowScale [
 ]
 
 { #category : 'tests' }
+FkBenchDatasetGeneratorTest >> testTooSmallScaleSignalsInsteadOfLoopingForever [
+	"5 Persons have only 5 * 4 = 20 possible FRIEND pairs, but the scale asks for 25"
+
+	self
+		should: [
+			FkBenchDatasetGenerator new
+				scale: (FkBenchScale named: 'tiny' personCount: 5);
+				generate ]
+		raise: Error.
+	self
+		shouldnt: [
+			FkBenchDatasetGenerator new
+				scale: (FkBenchScale named: 'minimal' personCount: 6);
+				generate ]
+		raise: Error
+]
+
+{ #category : 'tests' }
 FkBenchDatasetGeneratorTest >> testDifferentSeedProducesDifferentDataset [
 	self
 		deny: (self generateSmallWithSeed: 1) friendships

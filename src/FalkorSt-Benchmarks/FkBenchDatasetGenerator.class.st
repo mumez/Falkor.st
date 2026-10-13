@@ -7,6 +7,7 @@ Model:
 - (:Person)-[:FRIEND {since}]->(:Person) - no self-loops, no duplicate pairs
 - (:Person)-[:POSTED]->(:Post) - exactly one author per Post
 - (:Person)-[:LIKES {at}]->(:Post) - no duplicate pairs
+- #generate signals an Error when the scale is too small for the unique FRIEND pairs (< 6 Persons)
 
 Collaborators:
 - FkBenchScale: supplies the counts
@@ -40,6 +41,18 @@ FkBenchDatasetGenerator >> cityNames [
 	^ #( 'Tokyo' 'Osaka' 'Nagoya' 'Sapporo' 'Fukuoka' 'Kyoto' 'Kobe' 'Sendai'
 	     'Hiroshima' 'Yokohama' 'London' 'Paris' 'Berlin' 'Madrid' 'Rome'
 	     'New York' 'Boston' 'Chicago' 'Seattle' 'Toronto' )
+]
+
+{ #category : 'private' }
+FkBenchDatasetGenerator >> ensureUniqueEdges: count fitFromIdsUpTo: maxFromId toIdsUpTo: maxToId allowingSameIds: allowsSameIds [
+	"Fail fast instead of looping forever when the scale is too small for the requested unique pairs"
+
+	| possiblePairCount |
+	possiblePairCount := maxFromId * maxToId.
+	allowsSameIds ifFalse: [ possiblePairCount := possiblePairCount - (maxFromId min: maxToId) ].
+	count > possiblePairCount ifTrue: [
+		Error signal: ('Cannot generate {1} unique edges from only {2} possible pairs; use a larger scale'
+				 format: { count. possiblePairCount }) ]
 ]
 
 { #category : 'constants' }
@@ -174,6 +187,7 @@ FkBenchDatasetGenerator >> seed: anInteger [
 { #category : 'private' }
 FkBenchDatasetGenerator >> uniqueEdges: count fromIdsUpTo: maxFromId toIdsUpTo: maxToId allowingSameIds: allowsSameIds properties: propertiesBlock [
 	| seenPairs edges |
+	self ensureUniqueEdges: count fitFromIdsUpTo: maxFromId toIdsUpTo: maxToId allowingSameIds: allowsSameIds.
 	seenPairs := Set new.
 	edges := OrderedCollection new.
 	[ edges size < count ] whileTrue: [

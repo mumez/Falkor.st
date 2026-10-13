@@ -2,11 +2,13 @@
 I run the benchmark workload against one FkBenchTarget, sending the selectors shared by FkGraphDb and
 N4GraphDb directly to the target's #db, and collect an FkBenchSamples per operation.
 
-The load and query phases are separate messages so that a container-memory snapshot
+The warm-up, load, and query phases are separate messages so that a container-memory snapshot
 (scripts/benchmark/memory-snapshot.sh) can be taken between them. Query arguments are drawn from a
 Random seeded with #seed, so runners with the same configuration issue the same workload on any target.
 
 Responsibility:
+- #serverWarmupPhase - run the workload unmeasured on a small separate dataset, then empty the graph,
+  so a JIT-compiled server (Neo4j) is not measured cold
 - #loadPhase - prepare the target (reset + unmeasured indexes), insert the generated dataset one call
   at a time (C-node, C-rel samples) and record the total elapsed time
 - #queryPhase - run R-id, R-prop, R-where, R-hop, R-count, U-prop, U-merge, then D-node, each with
@@ -20,7 +22,7 @@ Collaborators:
 
 Public API and Key Messages:
 - #scale: / #seed: (default 42) / #warmup: (default 100) / #iterations: (default 1000) / #target:
-- #loadPhase / #queryPhase
+- #serverWarmupPhase (300 persons) / #serverWarmupPhaseWithPersons: / #loadPhase / #queryPhase
 - #samples / #loadElapsedMicroseconds / #loadOperationCount / #serverVersion
 "
 Class {
@@ -256,6 +258,28 @@ FkBenchRunner >> seed [
 { #category : 'accessing' }
 FkBenchRunner >> seed: anInteger [
 	seed := anInteger
+]
+
+{ #category : 'running' }
+FkBenchRunner >> serverWarmupPhase [
+	self serverWarmupPhaseWithPersons: 300
+]
+
+{ #category : 'running' }
+FkBenchRunner >> serverWarmupPhaseWithPersons: personCount [
+	"Run the whole workload, unmeasured, on a separate small dataset (different seed), then empty the
+	graph - so a JIT-compiled server (Neo4j) is warm before #loadPhase. My own samples are untouched."
+
+	(self class new
+		 scale: (FkBenchScale named: 'warmup' personCount: personCount);
+		 seed: self seed + 1;
+		 warmup: 0;
+		 iterations: 100;
+		 target: self target;
+		 yourself)
+		loadPhase;
+		queryPhase.
+	self target resetGraph
 ]
 
 { #category : 'accessing' }

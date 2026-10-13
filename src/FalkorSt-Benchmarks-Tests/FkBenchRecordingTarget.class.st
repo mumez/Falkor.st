@@ -1,12 +1,14 @@
 "
 I am a test FkBenchTarget backed by an FkBenchRecordingDb, so FkBenchRunner and FkBenchReport can be
-tested without a database. Preparing and closing do nothing.
+tested without a database. Preparing and closing do nothing except counting graph resets
+(#resetCount).
 "
 Class {
 	#name : 'FkBenchRecordingTarget',
 	#superclass : 'FkBenchTarget',
 	#instVars : [
-		'label'
+		'label',
+		'resetCount'
 	],
 	#category : 'FalkorSt-Benchmarks-Tests',
 	#package : 'FalkorSt-Benchmarks-Tests'
@@ -44,6 +46,17 @@ FkBenchRecordingTarget >> label: aString [
 
 { #category : 'preparing' }
 FkBenchRecordingTarget >> resetGraph [
+	self resetCount: self resetCount + 1
+]
+
+{ #category : 'accessing' }
+FkBenchRecordingTarget >> resetCount [
+	^ resetCount ifNil: [ resetCount := 0 ]
+]
+
+{ #category : 'accessing' }
+FkBenchRecordingTarget >> resetCount: anInteger [
+	resetCount := anInteger
 ]
 
 { #category : 'accessing' }

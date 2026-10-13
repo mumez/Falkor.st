@@ -5,6 +5,7 @@ Coverage:
 - performance-benchmark spec: ""Load phase""
 - performance-benchmark spec: ""Query phase""
 - performance-benchmark spec: ""Identical workload across targets""
+- performance-benchmark spec: ""Server warm-up""
 "
 Class {
 	#name : 'FkBenchRunnerTest',
@@ -87,6 +88,35 @@ FkBenchRunnerTest >> testSameConfigurationIssuesSameWorkload [
 	self
 		assert: (self runnerRunOn: (FkBenchRecordingTarget labeled: 'A')) db recordedMessages
 		equals: (self runnerRunOn: (FkBenchRecordingTarget labeled: 'B')) db recordedMessages
+]
+
+{ #category : 'tests' }
+FkBenchRunnerTest >> testServerWarmupExercisesTargetWithoutRecordingSamples [
+	| target runner |
+	target := FkBenchRecordingTarget new.
+	runner := self runnerOn: target.
+	runner serverWarmupPhaseWithPersons: 10.
+	self assert: runner samples isEmpty.
+	self assert: (target db recordedSelectors includes: #createNodeLabeled:properties:).
+	self assert: (target db recordedSelectors includes: #deleteNodeAt:withRelations:).
+	self assert: target resetCount equals: 2
+]
+
+{ #category : 'tests' }
+FkBenchRunnerTest >> testServerWarmupLeavesMeasuredWorkloadUnchanged [
+	| warmedTarget warmedRunner coldRunner warmupMessageCount |
+	warmedTarget := FkBenchRecordingTarget new.
+	warmedRunner := self runnerOn: warmedTarget.
+	warmedRunner serverWarmupPhaseWithPersons: 10.
+	warmupMessageCount := warmedTarget db recordedMessages size.
+	warmedRunner
+		loadPhase;
+		queryPhase.
+	coldRunner := self runnerRunOn: FkBenchRecordingTarget new.
+	self
+		assert: (warmedTarget db recordedMessages allButFirst: warmupMessageCount) size
+		equals: coldRunner db recordedMessages size.
+	self assert: warmedRunner samples keys equals: coldRunner samples keys
 ]
 
 { #category : 'tests' }
