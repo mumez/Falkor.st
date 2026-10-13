@@ -1,0 +1,34 @@
+# Benchmark databases for FalkorSt-Benchmarks (see docs/Performance.md).
+# Start one target at a time so the two databases never compete for CPU/memory:
+#   docker compose -f scripts/benchmark/docker-compose.yml --profile falkordb up -d
+#   docker compose -f scripts/benchmark/docker-compose.yml --profile neo4j up -d
+#   docker compose -f scripts/benchmark/docker-compose.yml down -v
+# Ports differ from the defaults (6379 / 7474) so a development FalkorDB or Neo4j can keep running.
+# Image tags follow the CI of each client (falkordb/falkordb:latest, neo4j:community); the actual
+# server versions are read back by the benchmark targets and recorded in the report.
+
+x-limits: &limits
+  cpus: "2"
+  mem_limit: 4g
+
+services:
+  falkordb:
+    profiles: [falkordb]
+    image: ${FALKORDB_IMAGE:-falkordb/falkordb:latest}
+    container_name: falkorst-bench-falkordb
+    ports:
+      - "16379:6379"
+    <<: *limits
+
+  neo4j:
+    profiles: [neo4j]
+    image: ${NEO4J_IMAGE:-neo4j:community}
+    container_name: falkorst-bench-neo4j
+    ports:
+      - "17474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/benchmark
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512m
+    <<: *limits
