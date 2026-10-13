@@ -399,16 +399,12 @@ endpoint graphQuery: 'social'
    params: { 'name'->'Alice' } asDictionary.
 endpoint graphRoQuery: 'social' cypher: 'MATCH (p) RETURN count(p)'.
 
-stick close.
 ```
 
-Results use the compact reply format by default. Pass `compact: false` to request the verbose
-format. Verbose replies don't include type information, so booleans, doubles, lists, maps, paths,
-points, vectors, and temporal values arrive as `String`s.
-
-Server-wide commands:
+### Server-wide commands:
 
 ```smalltalk
+endpoint := db endpoint. "or `stick endpoint`"
 endpoint graphList.                                   "all graph names"
 endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
 endpoint graphConfigGetAll.
@@ -416,11 +412,6 @@ endpoint graphConfigSet: { 'TIMEOUT_DEFAULT'->5000 } asDictionary.
 endpoint graphInfo.
 endpoint graphInfo: [ :opts | opts showRunningQueries; showWaitingQueries ].
 ```
-
-All graph-scoped commands are also available here, with the graph name as an argument (for
-example `graphExplain:cypher:`, `graphProfile:cypher:`, `graphSlowLog:`,
-`graphMemoryUsage:`, `graphIndexCreateBy:on:`, `graphConstraintCreateBy:on:`, `graphCopy:to:`, and
-`graphDelete:`).
 
 ## User-Defined Functions (`FalkorSt-Udf`)
 
