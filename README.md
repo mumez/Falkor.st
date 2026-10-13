@@ -122,18 +122,18 @@ db settings: (FkSettings new queryTimeoutMsecs: 1000; yourself).
 
 ```smalltalk
 "Create"
-alice := db createNodeLabeled: 'Person' properties: { 'name'->'Alice'. 'age'->30 }.
-db createNodeLabeled: #('Person' 'Employee') properties: { 'name'->'Carol' }.
+carol := db createNodeLabeled: 'Person' properties: { 'name'->'Carol'. 'age'->35 }.
+db createNodeLabeled: #('Person' 'Employee') properties: { 'name'->'Dave' }.
 
 "Create only if no identical node exists yet (MERGE)"
-db mergeNodeLabeled: 'Person' properties: { 'name'->'Alice'. 'age'->30 }.
+db mergeNodeLabeled: 'Person' properties: { 'name'->'Alice'. 'age'->30 }.  "Alice already exists: answers her"
 
 "Read"
-alice id.
-alice labels.          "an OrderedCollection('Person')"
-alice properties.
-alice @ 'name'.        "'Alice' - shortcut for #propertyAt:"
-db nodeAt: alice id.   "answers nil if there is no such node"
+carol id.
+carol labels.          "an OrderedCollection('Person')"
+carol properties.
+carol @ 'name'.        "'Carol' - shortcut for #propertyAt:"
+db nodeAt: carol id.   "answers nil if there is no such node"
 
 "Find"
 db nodesLabeled: 'Person'.
@@ -148,15 +148,15 @@ db nodesLabeled: 'Person'
 db countNodesLabeled: 'Person'.
 
 "Update"
-alice propertyAt: 'age' put: 31.
-alice mergeProperties: { 'city'->'Tokyo' }.             "add or overwrite some properties"
-alice properties: { 'name'->'Alice'. 'age'->31 }.       "replace all properties"
-alice removePropertyAt: 'city'.
-alice addLabel: 'Employee'.
-alice removeLabel: 'Employee'.
+carol propertyAt: 'age' put: 36.
+carol mergeProperties: { 'city'->'Tokyo' }.             "add or overwrite some properties"
+carol properties: { 'name'->'Carol'. 'age'->36 }.       "replace all properties"
+carol removePropertyAt: 'city'.
+carol addLabel: 'Employee'.
+carol removeLabel: 'Employee'.
 
 "Delete"
-alice delete.
+carol delete.
 db deleteNodesLabeled: 'Person' where: [ :n | (n @ 'age') < 18 ].
 ```
 
@@ -172,11 +172,11 @@ alice := (db nodesLabeled: 'Person' having: 'name' value: 'Alice') first.
 bob := (db nodesLabeled: 'Person' having: 'name' value: 'Bob') first.
 
 "Create (CREATE) or create-if-absent (MERGE) an outgoing relationship"
-knows := alice relateTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.
-alice relateOneTo: bob typed: 'FOLLOWS'.
+follows := alice relateTo: bob typed: 'FOLLOWS'.
+knows := alice relateOneTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.  "already exists: answers it"
 
-"The same, by node id"
-db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+"Create by node id"
+db createOutRelationshipTyped: 'FOLLOWS' fromNodeId: bob id toNodeId: alice id properties: #().
 
 "Read and update"
 knows type.            "'KNOWS'"
@@ -190,7 +190,7 @@ db relationshipsTyped: 'KNOWS' where: [ :r | (r @ 'since') >= 2020 ].
 db countRelationshipsTyped: 'KNOWS'.
 
 "Delete"
-knows delete.
+follows delete.
 db deleteRelationshipsTyped: 'FOLLOWS'.
 ```
 
