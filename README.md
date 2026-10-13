@@ -355,7 +355,7 @@ db profile: 'MATCH (p:Person) RETURN p'.
 
 "Queries that took longer than ~10 ms (GRAPH.SLOWLOG)"
 db slowLog do: [ :entry |
-   Transcript showCr: entry executionTimeMs printString, ' ms: ', entry query ].
+   Transcript crShow: entry executionTimeMs printString, ' ms: ', entry query ].
 db resetSlowLog.
 
 "Memory used by this graph, as a Dictionary (GRAPH.MEMORY USAGE)"
