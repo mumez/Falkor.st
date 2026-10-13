@@ -452,6 +452,12 @@ Load the default group, then run the `FalkorSt-*-Tests` packages with the Test R
 the same tests with [smalltalkCI](https://github.com/hpi-swa/smalltalkCI) against Pharo 12–14
 (see `.github/workflows/main.yml`).
 
+## Performance
+
+[docs/Performance.md](docs/Performance.md) compares `FkGraphDb` with Neo4reSt's `N4GraphDb`
+(Neo4j). It covers load and CRUD latency/throughput and container memory, and explains how to
+reproduce the numbers with the opt-in `Benchmarks` group.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

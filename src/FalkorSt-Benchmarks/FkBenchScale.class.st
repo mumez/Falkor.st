@@ -12,7 +12,7 @@ Collaborators:
 Public API and Key Messages:
 - FkBenchScale class >> small / medium / large - 1,000 / 10,000 / 100,000 Persons
 - FkBenchScale class >> named:personCount: - a custom scale
-- #personCount / #postCount / #friendshipCount / #postingCount / #likeCount
+- #personCount and the counts derived from it
 "
 Class {
 	#name : 'FkBenchScale',
