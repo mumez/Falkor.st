@@ -18,6 +18,7 @@ Coverage:
 - graph-object-api spec: ""Bulk-deleting nodes, relationships, or the whole graph""
 - graph-object-api spec: ""Finding orphaned nodes""
 - index/constraint/procedure facades delegating to FkGraphEndpoint for this graph
+- read-only queries on a graph that does not exist yet answering empty results (and 0 for counts)
 - #printOn: showing the graph name and, once a stick is set, its target URL and status
 "
 Class {
@@ -1169,4 +1170,26 @@ FkGraphDbTest >> testPrintStringWithoutStickShowsOnlyNameAndDoesNotConnect [
 	db := FkGraphDb named: 'social'.
 	self assert: db printString equals: 'a FkGraphDb(social)'.
 	self assert: (db instVarNamed: 'stick') isNil
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testReadsOnAGraphThatDoesNotExistYetAnswerEmptyResults [
+	| db |
+	db := self db.
+	self deny: db exists.
+	self assert: db countNodes equals: 0.
+	self assert: db countRelationships equals: 0.
+	self assert: db allLabels isEmpty.
+	self assert: db allRelationshipTypes isEmpty.
+	self assert: db allPropertyKeys isEmpty.
+	self assert: db orphanedNodes isEmpty.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testReadOnlyQueryErrorsOtherThanAMissingGraphStillSignal [
+	| db |
+	db := self db.
+	db runCypher: 'CREATE (:Person)'.
+	self should: [ db runReadOnlyCypher: 'RETURN (' ] raise: RsGenericError
 ]

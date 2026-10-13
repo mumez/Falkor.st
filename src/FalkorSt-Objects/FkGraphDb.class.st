@@ -339,7 +339,8 @@ FkGraphDb >> countRelationshipsTyped: typeOrTypes [
 	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
 	query addReturn: r count.
 	result := self runReadOnlyCypher: query.
-	^ result oneValueIfNone: [ FkGraphDbError invalidQuery signal: 'Expected a count query to answer one record' ]
+	"No record only when the graph does not exist yet - see #answerEmptyResultIfGraphIsMissingDuring:"
+	^ result oneValueIfNone: [ 0 ]
 ]
 
 { #category : 'actions-relationships' }
@@ -772,7 +773,8 @@ FkGraphDb >> countNodesLabeled: labelOrLabels [
 	query := CyQuery match: node.
 	query addReturn: n count.
 	result := self runReadOnlyCypher: query.
-	^ result oneValueIfNone: [ FkGraphDbError invalidQuery signal: 'Expected a count query to answer one record' ]
+	"No record only when the graph does not exist yet - see #answerEmptyResultIfGraphIsMissingDuring:"
+	^ result oneValueIfNone: [ 0 ]
 ]
 
 { #category : 'actions-nodes' }
@@ -900,13 +902,13 @@ FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict [
 
 { #category : 'querying' }
 FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict timeout: timeoutMsecsOrNil [
-	^ self
-		endpoint
-		graphRoQuery: self name
-		cypher: (self cypherStringFor: cypherQueryOrString)
-		params: argsDict
-		compact: true
-		timeout: timeoutMsecsOrNil
+	^ self answerEmptyResultIfGraphIsMissingDuring: [
+		self endpoint
+			graphRoQuery: self name
+			cypher: (self cypherStringFor: cypherQueryOrString)
+			params: argsDict
+			compact: true
+			timeout: timeoutMsecsOrNil ]
 ]
 
 { #category : 'actions-indexes' }
@@ -990,13 +992,28 @@ FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection
 
 { #category : 'actions-procedures' }
 FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil timeout: timeoutMsecsOrNil [
-	^ self endpoint
-		graphCallProcedure: self name
-		procedure: procedureName
-		arguments: argumentsCollection
-		yield: yieldNamesOrNil
-		readOnly: true
-		timeout: timeoutMsecsOrNil
+	^ self answerEmptyResultIfGraphIsMissingDuring: [
+		self endpoint
+			graphCallProcedure: self name
+			procedure: procedureName
+			arguments: argumentsCollection
+			yield: yieldNamesOrNil
+			readOnly: true
+			timeout: timeoutMsecsOrNil ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> answerEmptyResultIfGraphIsMissingDuring: aBlock [
+	"GRAPH.RO_QUERY fails on a graph that has not been created yet (GRAPH.QUERY would create it), so a
+	read-only query against it answers no records. FalkorDB gives that failure only the generic ERR
+	prefix, so whether the graph exists is checked instead of matching the version-dependent message."
+
+	^ aBlock
+		on: RsGenericError
+		do: [ :ex |
+			self exists
+				ifTrue: [ ex pass ]
+				ifFalse: [ ex return: (FkQueryResult new setHeader: #() records: #() statistics: #()) ] ]
 ]
 
 { #category : 'actions-nodes' }
