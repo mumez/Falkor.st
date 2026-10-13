@@ -22,8 +22,8 @@ Collaborators:
 
 Public API and Key Messages:
 - #scale: / #seed: (default 42) / #warmup: (default 100) / #iterations: (default 1000) / #target:
-- #serverWarmupPhase (300 persons) / #serverWarmupPhaseWithPersons: / #loadPhase / #queryPhase
-- #samples / #loadElapsedMicroseconds / #loadOperationCount / #serverVersion
+- #serverWarmupPhase (300 persons) / #loadPhase / #queryPhase
+- #samples - read by FkBenchReport
 "
 Class {
 	#name : 'FkBenchRunner',

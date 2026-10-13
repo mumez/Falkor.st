@@ -16,7 +16,7 @@ Collaborators:
 Public API and Key Messages:
 - FkBenchSamples class >> operation:target:
 - #addMicroseconds:
-- #count / #mean / #median / #p95 / #p99 / #percentile: / #min / #max / #totalMilliseconds / #opsPerSecond
+- #mean / #median / #p95 / #p99 / #opsPerSecond
 "
 Class {
 	#name : 'FkBenchSamples',
