@@ -915,7 +915,7 @@ FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict timeout:
 
 { #category : 'actions-indexes' }
 FkGraphDb >> indexes [
-	^ FkGraphIndexInfo allFromQueryResult: (self callReadOnlyProcedure: 'db.indexes')
+	^ self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphIndexes: self name ]
 ]
 
 { #category : 'actions-indexes' }
@@ -930,7 +930,7 @@ FkGraphDb >> dropIndexBy: aBlock [
 
 { #category : 'actions-constraints' }
 FkGraphDb >> constraints [
-	^ FkGraphConstraintInfo allFromQueryResult: (self callReadOnlyProcedure: 'db.constraints')
+	^ self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphConstraints: self name ]
 ]
 
 { #category : 'actions-constraints' }
@@ -1005,17 +1005,24 @@ FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection
 ]
 
 { #category : 'private' }
-FkGraphDb >> answerEmptyResultIfGraphIsMissingDuring: aBlock [
+FkGraphDb >> answer: emptyValue ifGraphIsMissingDuring: aBlock [
 	"GRAPH.RO_QUERY fails on a graph that has not been created yet (GRAPH.QUERY would create it), so a
-	read-only query against it answers no records. FalkorDB gives that failure only the generic ERR
-	prefix, so whether the graph exists is checked instead of matching the version-dependent message."
+	read-only query against it answers emptyValue instead. FalkorDB gives that failure only the generic
+	ERR prefix, so whether the graph exists is checked instead of matching the version-dependent message."
 
 	^ aBlock
 		on: RsGenericError
 		do: [ :ex |
 			self exists
 				ifTrue: [ ex pass ]
-				ifFalse: [ ex return: (FkQueryResult new setHeader: #() records: #() statistics: #()) ] ]
+				ifFalse: [ ex return: emptyValue ] ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> answerEmptyResultIfGraphIsMissingDuring: aBlock [
+	^ self
+		answer: (FkQueryResult new setHeader: #() records: #() statistics: #())
+		ifGraphIsMissingDuring: aBlock
 ]
 
 { #category : 'actions-nodes' }

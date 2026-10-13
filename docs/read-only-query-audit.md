@@ -42,31 +42,29 @@ graphIndexes: graphName
 `graphConstraints:` has the same shape, with `db.constraints` and `FkGraphConstraintInfo`.
 `FkGraphDb>>indexes` / `>>constraints` simply delegate to these methods.
 
-Decision. This is the recommended approach, checked against the code, plus one refinement to avoid
-duplicating the mapping:
+Decision. This is the recommended approach, checked against the code. It was revised after PR #49
+review so that the procedure names and the read-only CALL live only in Core:
 
-1. **Core: share the mapping.** Add `FkGraphIndexInfo class >> allFromQueryResult: aFkQueryResult`
-   and `FkGraphConstraintInfo class >> allFromQueryResult: aFkQueryResult`. Each answers
-   `aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]`. This becomes the
-   only place where procedure records are mapped to info objects.
+1. **Core: share the mapping.** A new abstract superclass `FkGraphProcedureRowInfo` holds the raw
+   record, `class >> fromRecord:` / `class >> allFromQueryResult:` and the shared
+   `label` / `entityType` / `properties` / `status` accessors. `FkGraphIndexInfo` and
+   `FkGraphConstraintInfo` subclass it and keep only their column-specific accessors.
 2. **Endpoint: go read-only, keep the raw error.** `graphIndexes:` becomes
    `^ FkGraphIndexInfo allFromQueryResult: (self graphCallProcedure: graphName procedure: 'db.indexes' arguments: #() yield: nil readOnly: true)`.
    `graphConstraints:` gets the same change. The endpoint stays a thin protocol layer and does not
-   know about missing graphs, matching `#graphRoQuery:*`.
-3. **FkGraphDb: answer empty on a missing graph.** `indexes` becomes
-   `^ FkGraphIndexInfo allFromQueryResult: (self callReadOnlyProcedure: 'db.indexes')`. `constraints`
-   gets the same change. `#callReadOnlyProcedure:` already wraps the call in
-   `#answerEmptyResultIfGraphIsMissingDuring:`, so a missing graph gives an empty FkQueryResult. Its
-   header and records are both `#()`, so `mappedRecords` gives an empty collection and so does
-   `allFromQueryResult:`.
+   know about missing graphs, matching `#graphRoQuery:*`. It is the only place that knows the
+   procedure names.
+3. **FkGraphDb: delegate and answer empty on a missing graph.** The missing-graph guard is
+   generalized to `#answer:ifGraphIsMissingDuring:` (`#answerEmptyResultIfGraphIsMissingDuring:`
+   now delegates to it with an empty FkQueryResult). `indexes` becomes
+   `^ self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphIndexes: self name ]`,
+   and `constraints` gets the same change.
 
-Rejected alternative: wrapping `[ self endpoint graphIndexes: self name ]` directly in
-`#answerEmptyResultIfGraphIsMissingDuring:`. On a missing graph that wrapper answers an
-**FkQueryResult**, not a collection of FkGraphIndexInfo, so `indexes` would return the wrong type.
-It would need a second, collection-flavoured wrapper. Going through `#callReadOnlyProcedure:` reuses
-the existing wrapper unchanged and also makes `indexes` / `constraints` honour
-`FkGraphDb>>settings queryTimeoutMsecs`, like every other FkGraphDb read. Before this change they
-used the endpoint's `queryTimeoutMsecs`; both default to `FkSettings default queryTimeoutMsecs`.
+Superseded first version: `FkGraphDb` called `#callReadOnlyProcedure: 'db.indexes'` itself. That
+duplicated the procedure names and the read-only CALL in two layers, so it was replaced by the
+delegation above. As before this PR, `indexes` / `constraints` use the endpoint's
+`queryTimeoutMsecs` rather than `FkGraphDb>>settings queryTimeoutMsecs`; both default to
+`FkSettings default queryTimeoutMsecs`.
 
 **What a direct FkGraphEndpoint caller sees after the change:** on a missing graph,
 `endpoint graphIndexes: 'nope'` and `endpoint graphConstraints: 'nope'` **raise `RsGenericError`**
@@ -144,8 +142,8 @@ So no result-handling change is needed. No (a) method calls `records first` or
 | FkGraphDb | `oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returnIn:returning:` | private `oneHopPathsQueryResultFor:...` → `runCypher:` (MATCH s WHERE id / WITH s / MATCH p=... / RETURN p) → `firstColumnValues collect:` | a | private `oneHopPathsQueryResultFor:...` → `runReadOnlyCypher:` | empty collection |
 | FkGraphDb | `existsOneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:` | same private method (RETURN count(p) > 0) → `#oneValueIfNone: [ false ]` | a | covered by the private-method change | `false` |
 | FkGraphDb | `existsOneHopPathsTyped:direction:from:whereIn:` | → the full `existsOneHopPathsTyped:...` | a | none (delegates) | `false` |
-| FkGraphDb | `indexes` | `endpoint graphIndexes:` → non-RO `graphCallProcedure:procedure:` (CALL db.indexes()) | a | `FkGraphIndexInfo allFromQueryResult: (self callReadOnlyProcedure: 'db.indexes')` | empty collection |
-| FkGraphDb | `constraints` | `endpoint graphConstraints:` → non-RO `graphCallProcedure:procedure:` (CALL db.constraints()) | a | `FkGraphConstraintInfo allFromQueryResult: (self callReadOnlyProcedure: 'db.constraints')` | empty collection |
+| FkGraphDb | `indexes` | `endpoint graphIndexes:` → non-RO `graphCallProcedure:procedure:` (CALL db.indexes()) | a | `self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphIndexes: self name ]` | empty collection |
+| FkGraphDb | `constraints` | `endpoint graphConstraints:` → non-RO `graphCallProcedure:procedure:` (CALL db.constraints()) | a | `self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphConstraints: self name ]` | empty collection |
 
 ### (a) Pure reads: FkGraphEndpoint (FalkorSt-Core)
 
