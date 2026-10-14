@@ -1191,8 +1191,8 @@ FkGraphDbTest >> testIndexesAndConstraintsOnAGraphThatDoesNotExistYetAnswerEmpty
 	| db |
 	db := self db.
 	self deny: db exists.
-	self assert: db indexes isEmpty.
-	self assert: db constraints isEmpty.
+	self assert: db indexes equals: #().
+	self assert: db constraints equals: #().
 	self deny: db exists
 ]
 

@@ -22,9 +22,9 @@ db exists.   "true!"
 ```
 
 `FkGraphDb` already has a safe read path. `#runReadOnlyCypher:*` and `#callReadOnlyProcedure:*` send
-`GRAPH.RO_QUERY` inside `#answerEmptyResultIfGraphIsMissingDuring:`. That wrapper catches
+`GRAPH.RO_QUERY` inside `#tryReturn:ifGraphMissing: self emptyResult`. That wrapper catches
 `RsGenericError`. If `#exists` (GRAPH.LIST) is false, it answers
-`FkQueryResult new setHeader: #() records: #() statistics: #()`. Otherwise it passes the error on.
+`FkQueryResult empty`. Otherwise it passes the error on.
 This is already used by `countNodes*`, `countRelationships*`, `allLabels`, `allRelationshipTypes`,
 `allPropertyKeys`, `orphanedNodes` and `FkGraphNode>>labelsFromDb`, and
 `FkGraphDbTest>>testReadsOnAGraphThatDoesNotExistYetAnswerEmptyResults` covers it.
@@ -55,9 +55,9 @@ review so that the procedure names and the read-only CALL live only in Core:
    know about missing graphs, matching `#graphRoQuery:*`. It is the only place that knows the
    procedure names.
 3. **FkGraphDb: delegate and answer empty on a missing graph.** The missing-graph guard is
-   generalized to `#answer:ifGraphIsMissingDuring:` (`#answerEmptyResultIfGraphIsMissingDuring:`
-   now delegates to it with an empty FkQueryResult). `indexes` becomes
-   `^ self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphIndexes: self name ]`,
+   generalized to `#tryReturn:ifGraphMissing:`, with the fallback value passed in (`self emptyResult`,
+   i.e. `FkQueryResult empty`, for the query paths). `indexes` becomes
+   `^ self tryReturn: [ self endpoint graphIndexes: self name ] ifGraphMissing: #()`,
    and `constraints` gets the same change.
 
 Superseded first version: `FkGraphDb` called `#callReadOnlyProcedure: 'db.indexes'` itself. That
@@ -142,8 +142,8 @@ So no result-handling change is needed. No (a) method calls `records first` or
 | FkGraphDb | `oneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:returnIn:returning:` | private `oneHopPathsQueryResultFor:...` → `runCypher:` (MATCH s WHERE id / WITH s / MATCH p=... / RETURN p) → `firstColumnValues collect:` | a | private `oneHopPathsQueryResultFor:...` → `runReadOnlyCypher:` | empty collection |
 | FkGraphDb | `existsOneHopPathsTyped:direction:from:havingAll:endNodeWithLabels:havingAll:whereIn:` | same private method (RETURN count(p) > 0) → `#oneValueIfNone: [ false ]` | a | covered by the private-method change | `false` |
 | FkGraphDb | `existsOneHopPathsTyped:direction:from:whereIn:` | → the full `existsOneHopPathsTyped:...` | a | none (delegates) | `false` |
-| FkGraphDb | `indexes` | `endpoint graphIndexes:` → non-RO `graphCallProcedure:procedure:` (CALL db.indexes()) | a | `self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphIndexes: self name ]` | empty collection |
-| FkGraphDb | `constraints` | `endpoint graphConstraints:` → non-RO `graphCallProcedure:procedure:` (CALL db.constraints()) | a | `self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphConstraints: self name ]` | empty collection |
+| FkGraphDb | `indexes` | `endpoint graphIndexes:` → non-RO `graphCallProcedure:procedure:` (CALL db.indexes()) | a | `self tryReturn: [ self endpoint graphIndexes: self name ] ifGraphMissing: #()` | empty collection |
+| FkGraphDb | `constraints` | `endpoint graphConstraints:` → non-RO `graphCallProcedure:procedure:` (CALL db.constraints()) | a | `self tryReturn: [ self endpoint graphConstraints: self name ] ifGraphMissing: #()` | empty collection |
 
 ### (a) Pure reads: FkGraphEndpoint (FalkorSt-Core)
 
@@ -257,7 +257,7 @@ graph.
 | Test class | Selector | Asserts |
 |---|---|---|
 | FkGraphIndexInfoTest *(new, FalkorSt-Core-Tests, pure unit)* | `testAllFromQueryResultMapsEachRecord` | `allFromQueryResult:` on an FkQueryResult with a header and two records answers two FkGraphIndexInfo whose `label` comes from the mapped record. |
-| FkGraphIndexInfoTest | `testAllFromQueryResultOnEmptyResultAnswersEmpty` | `allFromQueryResult: (FkQueryResult new setHeader: #() records: #() statistics: #())` is empty. |
+| FkGraphIndexInfoTest | `testAllFromQueryResultOnEmptyResultAnswersEmpty` | `allFromQueryResult: (FkQueryResult empty)` is empty. |
 | FkGraphConstraintInfoTest *(new, FalkorSt-Core-Tests, pure unit)* | `testAllFromQueryResultMapsEachRecord` / `testAllFromQueryResultOnEmptyResultAnswersEmpty` | Same as above for FkGraphConstraintInfo. |
 | FkGraphEndpointTest | `testGraphIndexesOnAMissingGraphSignalsWithoutCreatingIt` | `self should: [ endpoint graphIndexes: graphName ] raise: RsGenericError`; afterwards `endpoint graphList` does not include graphName. |
 | FkGraphEndpointTest | `testGraphConstraintsOnAMissingGraphSignalsWithoutCreatingIt` | Same for `graphConstraints:`. |

@@ -28,7 +28,7 @@ Class {
 
 { #category : 'instance creation' }
 FkGraphProcedureRowInfo class >> allFromQueryResult: aFkQueryResult [
-	^ aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]
+	^ (aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]) asArray
 ]
 
 { #category : 'instance creation' }

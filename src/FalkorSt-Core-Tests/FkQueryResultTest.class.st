@@ -65,6 +65,15 @@ FkQueryResultTest >> testDecodesRelationshipValue [
 ]
 
 { #category : 'tests' }
+FkQueryResultTest >> testEmptyHasNoHeaderRecordsOrStatistics [
+	| result |
+	result := FkQueryResult empty.
+	self assert: result header isEmpty.
+	self assert: result records isEmpty.
+	self assert: result statistics isEmpty
+]
+
+{ #category : 'tests' }
 FkQueryResultTest >> testQueryWithoutReturnClauseExposesOnlyStatistics [
 	| result |
 	result := self endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.

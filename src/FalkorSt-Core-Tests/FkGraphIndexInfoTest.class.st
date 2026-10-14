@@ -18,6 +18,7 @@ FkGraphIndexInfoTest >> testAllFromQueryResultMapsEachRecord [
 		records: #(#('Person' 'NODE') #('KNOWS' 'RELATIONSHIP'))
 		statistics: #().
 	infos := FkGraphIndexInfo allFromQueryResult: result.
+	self assert: infos class equals: Array.
 	self assert: (infos collect: [ :each | each class ]) asArray equals: { FkGraphIndexInfo. FkGraphIndexInfo }.
 	self assert: (infos collect: [ :each | each label ]) asArray equals: #('Person' 'KNOWS').
 	self assert: infos second entityType equals: 'RELATIONSHIP'
@@ -25,5 +26,5 @@ FkGraphIndexInfoTest >> testAllFromQueryResultMapsEachRecord [
 
 { #category : 'tests' }
 FkGraphIndexInfoTest >> testAllFromQueryResultOnEmptyResultAnswersEmpty [
-	self assert: (FkGraphIndexInfo allFromQueryResult: (FkQueryResult new setHeader: #() records: #() statistics: #())) isEmpty
+	self assert: (FkGraphIndexInfo allFromQueryResult: FkQueryResult empty) isEmpty
 ]

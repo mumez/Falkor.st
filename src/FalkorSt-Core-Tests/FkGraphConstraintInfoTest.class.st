@@ -18,6 +18,7 @@ FkGraphConstraintInfoTest >> testAllFromQueryResultMapsEachRecord [
 		records: #(#('UNIQUE' 'Person') #('MANDATORY' 'KNOWS'))
 		statistics: #().
 	infos := FkGraphConstraintInfo allFromQueryResult: result.
+	self assert: infos class equals: Array.
 	self assert: (infos collect: [ :each | each class ]) asArray equals: { FkGraphConstraintInfo. FkGraphConstraintInfo }.
 	self assert: (infos collect: [ :each | each entityName ]) asArray equals: #('Person' 'KNOWS').
 	self assert: infos second constraintType equals: 'MANDATORY'
@@ -25,5 +26,5 @@ FkGraphConstraintInfoTest >> testAllFromQueryResultMapsEachRecord [
 
 { #category : 'tests' }
 FkGraphConstraintInfoTest >> testAllFromQueryResultOnEmptyResultAnswersEmpty [
-	self assert: (FkGraphConstraintInfo allFromQueryResult: (FkQueryResult new setHeader: #() records: #() statistics: #())) isEmpty
+	self assert: (FkGraphConstraintInfo allFromQueryResult: FkQueryResult empty) isEmpty
 ]

@@ -341,7 +341,7 @@ FkGraphDb >> countRelationshipsTyped: typeOrTypes [
 	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
 	query addReturn: r count.
 	result := self runReadOnlyCypher: query.
-	"No record only when the graph does not exist yet - see #answerEmptyResultIfGraphIsMissingDuring:"
+	"No record only when the graph does not exist yet - see #tryReturn:ifGraphMissing:"
 	^ result oneValueIfNone: [ 0 ]
 ]
 
@@ -775,7 +775,7 @@ FkGraphDb >> countNodesLabeled: labelOrLabels [
 	query := CyQuery match: node.
 	query addReturn: n count.
 	result := self runReadOnlyCypher: query.
-	"No record only when the graph does not exist yet - see #answerEmptyResultIfGraphIsMissingDuring:"
+	"No record only when the graph does not exist yet - see #tryReturn:ifGraphMissing:"
 	^ result oneValueIfNone: [ 0 ]
 ]
 
@@ -904,18 +904,20 @@ FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict [
 
 { #category : 'querying' }
 FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict timeout: timeoutMsecsOrNil [
-	^ self answerEmptyResultIfGraphIsMissingDuring: [
-		self endpoint
-			graphRoQuery: self name
-			cypher: (self cypherStringFor: cypherQueryOrString)
-			params: argsDict
-			compact: true
-			timeout: timeoutMsecsOrNil ]
+	^ self
+		tryReturn: [
+			self endpoint
+				graphRoQuery: self name
+				cypher: (self cypherStringFor: cypherQueryOrString)
+				params: argsDict
+				compact: true
+				timeout: timeoutMsecsOrNil ]
+		ifGraphMissing: self emptyResult
 ]
 
 { #category : 'actions-indexes' }
 FkGraphDb >> indexes [
-	^ self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphIndexes: self name ]
+	^ self tryReturn: [ self endpoint graphIndexes: self name ] ifGraphMissing: #()
 ]
 
 { #category : 'actions-indexes' }
@@ -930,7 +932,7 @@ FkGraphDb >> dropIndexBy: aBlock [
 
 { #category : 'actions-constraints' }
 FkGraphDb >> constraints [
-	^ self answer: OrderedCollection new ifGraphIsMissingDuring: [ self endpoint graphConstraints: self name ]
+	^ self tryReturn: [ self endpoint graphConstraints: self name ] ifGraphMissing: #()
 ]
 
 { #category : 'actions-constraints' }
@@ -994,35 +996,36 @@ FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection
 
 { #category : 'actions-procedures' }
 FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil timeout: timeoutMsecsOrNil [
-	^ self answerEmptyResultIfGraphIsMissingDuring: [
-		self endpoint
-			graphCallProcedure: self name
-			procedure: procedureName
-			arguments: argumentsCollection
-			yield: yieldNamesOrNil
-			readOnly: true
-			timeout: timeoutMsecsOrNil ]
+	^ self
+		tryReturn: [
+			self endpoint
+				graphCallProcedure: self name
+				procedure: procedureName
+				arguments: argumentsCollection
+				yield: yieldNamesOrNil
+				readOnly: true
+				timeout: timeoutMsecsOrNil ]
+		ifGraphMissing: self emptyResult
 ]
 
 { #category : 'private' }
-FkGraphDb >> answer: emptyValue ifGraphIsMissingDuring: aBlock [
-	"GRAPH.RO_QUERY fails on a graph that has not been created yet (GRAPH.QUERY would create it), so a
-	read-only query against it answers emptyValue instead. FalkorDB gives that failure only the generic
-	ERR prefix, so whether the graph exists is checked instead of matching the version-dependent message."
+FkGraphDb >> tryReturn: returningBlock ifGraphMissing: fallbackValue [
+	"Answer the value of returningBlock. GRAPH.RO_QUERY fails on a graph that has not been created yet
+	(GRAPH.QUERY would create it), so a read-only query against it answers fallbackValue instead. FalkorDB
+	gives that failure only the generic ERR prefix, so whether the graph exists is checked instead of
+	matching the version-dependent message."
 
-	^ aBlock
+	^ returningBlock
 		on: RsGenericError
 		do: [ :ex |
 			self exists
 				ifTrue: [ ex pass ]
-				ifFalse: [ ex return: emptyValue ] ]
+				ifFalse: [ ex return: fallbackValue ] ]
 ]
 
 { #category : 'private' }
-FkGraphDb >> answerEmptyResultIfGraphIsMissingDuring: aBlock [
-	^ self
-		answer: (FkQueryResult new setHeader: #() records: #() statistics: #())
-		ifGraphIsMissingDuring: aBlock
+FkGraphDb >> emptyResult [
+	^ FkQueryResult empty
 ]
 
 { #category : 'actions-nodes' }
