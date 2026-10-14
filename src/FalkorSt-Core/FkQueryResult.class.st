@@ -230,6 +230,11 @@ FkQueryResult class >> decodeVerboseValue: rawValue [
 ]
 
 { #category : 'instance creation' }
+FkQueryResult class >> empty [
+	^ self new setHeader: #() records: #() statistics: #()
+]
+
+{ #category : 'instance creation' }
 FkQueryResult class >> fromCompactReply: rawReply resolvedBy: anEndpoint graph: graphName [
 	rawReply size = 1
 		ifTrue: [ ^ self new setHeader: #() records: #() statistics: rawReply first ].

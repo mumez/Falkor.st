@@ -17,6 +17,7 @@ Coverage:
 - graph-object-api spec: ""Creating/merging an outgoing relationship to another node""
 - graph-object-api spec: ""Collecting the distinct relationship types of a node""
 - graph-object-api spec: ""Adding/removing labels and re-querying them from the database""
+- #printOn: showing the wrapped node's id
 "
 Class {
 	#name : 'FkGraphNodeTest',
@@ -115,6 +116,43 @@ FkGraphNodeTest >> testRelationshipsTypedWhereFiltersUsingAnArbitraryWhereClause
 	alice := (self createAliceWithBobAndCarolIn: self db) first.
 	self assert: (alice relationshipsTyped: 'KNOWS' where: [ :start :rel :end | (rel @ 'since') equals: 2020 ]) size equals: 1.
 	self assert: (alice relationshipsTyped: 'KNOWS' where: [ :start :rel :end | (rel @ 'since') equals: 1999 ]) isEmpty
+]
+
+{ #category : 'creating' }
+FkGraphNodeTest >> createAliceOfADroppedGraphIn: db [
+	| alice |
+	alice := (self createAliceWithBobAndCarolIn: db) first.
+	db drop.
+	self deny: db exists.
+	^ alice
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testReadsOnANodeOfADroppedGraphAnswerEmptyWithoutRecreatingIt [
+	| db alice anyRel |
+	db := self db.
+	alice := self createAliceOfADroppedGraphIn: db.
+	anyRel := [ :start :rel :end | nil ].
+	self assert: alice relationships isEmpty.
+	self assert: alice inRelationships isEmpty.
+	self assert: alice outRelationships isEmpty.
+	self assert: (alice relationshipsTyped: 'KNOWS') isEmpty.
+	self assert: (alice oneHopPathsTyped: 'KNOWS' where: anyRel) isEmpty.
+	self assert: (alice inOneHopPathsTyped: 'LIKES' where: anyRel) isEmpty.
+	self assert: (alice outOneHopPathsTyped: 'KNOWS' where: anyRel) isEmpty.
+	self assert: alice types isEmpty.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testExistsChecksOnANodeOfADroppedGraphAnswerFalseWithoutRecreatingIt [
+	| db alice |
+	db := self db.
+	alice := self createAliceOfADroppedGraphIn: db.
+	self deny: (alice existsRelationshipTyped: 'KNOWS').
+	self deny: (alice existsInRelationshipTyped: 'LIKES').
+	self deny: (alice existsOutRelationshipTyped: 'KNOWS').
+	self deny: db exists
 ]
 
 { #category : 'tests' }
@@ -496,4 +534,11 @@ FkGraphNodeTest >> testNameColonUpdatesTheNamePropertyValue [
 	graphNode name: 'NewName'.
 	self assert: graphNode name equals: 'NewName'.
 	self assert: (graphNode propertyAt: 'name') equals: 'NewName'
+]
+
+{ #category : 'tests' }
+FkGraphNodeTest >> testPrintStringShowsTheId [
+	| graphNode |
+	graphNode := FkGraphNode on: (FkNode id: 42 labels: #() properties: Dictionary new) in: nil.
+	self assert: graphNode printString equals: 'a FkGraphNode(id:42)'
 ]

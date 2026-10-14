@@ -82,6 +82,21 @@ FkGraphRelationshipTest >> testOwnAndOtherResolveCorrectlyForInRelationship [
 ]
 
 { #category : 'tests' }
+FkGraphRelationshipTest >> testNodeNavigationOnARelationshipOfADroppedGraphAnswersNilWithoutRecreatingIt [
+	| db alice rel |
+	db := self db.
+	alice := (self createAliceKnowsBobIn: db) first.
+	rel := alice outRelationships first.
+	db drop.
+	self deny: db exists.
+	self assert: rel startNode isNil.
+	self assert: rel endNode isNil.
+	self assert: rel otherNode isNil.
+	self assert: rel ownNode isNil.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
 FkGraphRelationshipTest >> testOtherNodeSignalsUnknownDirectionWhenNavigationOriginIsNotSet [
 	| db people alice rel |
 	db := self db.
@@ -192,6 +207,22 @@ FkGraphRelationshipTest >> testPropertyAtPutOnlyAffectsTheMatchingRelationshipWh
 	rel propertyAt: 'weight' put: 5.
 	self assert: (rel propertyAt: 'weight') equals: 5.
 	self assert: ((db relationshipAt: other id) propertyAt: 'weight') isNil
+]
+
+{ #category : 'tests' }
+FkGraphRelationshipTest >> testDeleteOnlyRemovesTheMatchingRelationshipWhenAnotherSharesTheStartNode [
+	| db alice bob carol rel other |
+	db := self db.
+	alice := db createNodeLabeled: 'Person' properties: { 'name' -> 'Alice' }.
+	bob := db createNodeLabeled: 'Person' properties: { 'name' -> 'Bob' }.
+	carol := db createNodeLabeled: 'Person' properties: { 'name' -> 'Carol' }.
+	rel := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: bob id properties: #().
+	other := db createOutRelationshipTyped: 'KNOWS' fromNodeId: alice id toNodeId: carol id properties: #().
+	rel delete.
+	self assert: rel isDeleted.
+	self assert: (db relationshipAt: rel id) isNil.
+	self assert: (db relationshipAt: other id) notNil.
+	self assert: (db countNodesLabeled: 'Person') equals: 3
 ]
 
 { #category : 'tests' }

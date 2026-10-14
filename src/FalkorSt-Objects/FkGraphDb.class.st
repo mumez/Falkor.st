@@ -12,6 +12,8 @@ Responsibility:
 - Answer the FkGraphEndpoint (#endpoint) that runs GRAPH.* commands for this graph
 - Provide thin #runCypher:/#runReadOnlyCypher: wrappers so callers don't have to route
   through #endpoint and #name themselves
+- Send pure reads as GRAPH.RO_QUERY, so reading a graph that does not exist answers nil, empty,
+  false, or 0 instead of creating it
 
 Collaborators:
 - FkFalkorStick: the connection I hold or lazily create
@@ -339,7 +341,8 @@ FkGraphDb >> countRelationshipsTyped: typeOrTypes [
 	query := CyQuery match: ('' asCypherIdentifier asNode - rel -> '' asCypherIdentifier asNode).
 	query addReturn: r count.
 	result := self runReadOnlyCypher: query.
-	^ result oneValueIfNone: [ FkGraphDbError invalidQuery signal: 'Expected a count query to answer one record' ]
+	"No record only when the graph does not exist yet - see #tryReturn:ifGraphMissing:"
+	^ result oneValueIfNone: [ 0 ]
 ]
 
 { #category : 'actions-relationships' }
@@ -397,7 +400,7 @@ FkGraphDb >> relationshipsTyped: typeOrTypes where: whereClauseBuilder orderBy: 
 		orderBy: (orderByClauseBuilder ifNotNil: [ orderByClauseBuilder value: r ])
 		skip: skip
 		limit: limit.
-	result := self runCypher: query.
+	result := self runReadOnlyCypher: query.
 	^ self relationshipsFrom: result
 ]
 
@@ -421,7 +424,7 @@ FkGraphDb >> relationshipAt: systemId [
 	r := 'r' asCypherIdentifier.
 	rel := CyRelationship start: s end: e name: r.
 	query := CyQuery match: rel where: (r getId equals: systemId) return: r.
-	result := self runCypher: query.
+	result := self runReadOnlyCypher: query.
 	^ result oneValueDo: [ :rawRelationship | FkGraphRelationship on: rawRelationship in: self ]
 ]
 
@@ -548,7 +551,7 @@ FkGraphDb >> oneHopPathsQueryResultFor: typeOrTypes direction: direction from: s
 		whereIn: whereClauseBuilder
 		pathProcessIn: processBlock
 		returnIn: returnBlock.
-	^ self runCypher: query
+	^ self runReadOnlyCypher: query
 ]
 
 { #category : 'actions-paths' }
@@ -772,7 +775,8 @@ FkGraphDb >> countNodesLabeled: labelOrLabels [
 	query := CyQuery match: node.
 	query addReturn: n count.
 	result := self runReadOnlyCypher: query.
-	^ result oneValueIfNone: [ FkGraphDbError invalidQuery signal: 'Expected a count query to answer one record' ]
+	"No record only when the graph does not exist yet - see #tryReturn:ifGraphMissing:"
+	^ result oneValueIfNone: [ 0 ]
 ]
 
 { #category : 'actions-nodes' }
@@ -828,6 +832,21 @@ FkGraphDb >> labelsFor: labelOrLabels [
 { #category : 'accessing' }
 FkGraphDb >> name [
 	^ name ifNil: [ self defaultName ]
+]
+
+{ #category : 'printing' }
+FkGraphDb >> printOn: aStream [
+	"Read the stick variable directly - #stick would lazily create and connect one just for printing"
+
+	super printOn: aStream.
+	aStream nextPut: $(; nextPutAll: self name asString.
+	stick ifNotNil: [ :aStick |
+		aStream
+			space;
+			nextPutAll: aStick targetUrl asString;
+			space;
+			nextPutAll: aStick statusString ].
+	aStream nextPut: $)
 ]
 
 { #category : 'private' }
@@ -886,17 +905,19 @@ FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict [
 { #category : 'querying' }
 FkGraphDb >> runReadOnlyCypher: cypherQueryOrString arguments: argsDict timeout: timeoutMsecsOrNil [
 	^ self
-		endpoint
-		graphRoQuery: self name
-		cypher: (self cypherStringFor: cypherQueryOrString)
-		params: argsDict
-		compact: true
-		timeout: timeoutMsecsOrNil
+		tryReturn: [
+			self endpoint
+				graphRoQuery: self name
+				cypher: (self cypherStringFor: cypherQueryOrString)
+				params: argsDict
+				compact: true
+				timeout: timeoutMsecsOrNil ]
+		ifGraphMissing: self emptyResult
 ]
 
 { #category : 'actions-indexes' }
 FkGraphDb >> indexes [
-	^ self endpoint graphIndexes: self name
+	^ self tryReturn: [ self endpoint graphIndexes: self name ] ifGraphMissing: #()
 ]
 
 { #category : 'actions-indexes' }
@@ -911,7 +932,7 @@ FkGraphDb >> dropIndexBy: aBlock [
 
 { #category : 'actions-constraints' }
 FkGraphDb >> constraints [
-	^ self endpoint graphConstraints: self name
+	^ self tryReturn: [ self endpoint graphConstraints: self name ] ifGraphMissing: #()
 ]
 
 { #category : 'actions-constraints' }
@@ -975,13 +996,36 @@ FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection
 
 { #category : 'actions-procedures' }
 FkGraphDb >> callReadOnlyProcedure: procedureName arguments: argumentsCollection yield: yieldNamesOrNil timeout: timeoutMsecsOrNil [
-	^ self endpoint
-		graphCallProcedure: self name
-		procedure: procedureName
-		arguments: argumentsCollection
-		yield: yieldNamesOrNil
-		readOnly: true
-		timeout: timeoutMsecsOrNil
+	^ self
+		tryReturn: [
+			self endpoint
+				graphCallProcedure: self name
+				procedure: procedureName
+				arguments: argumentsCollection
+				yield: yieldNamesOrNil
+				readOnly: true
+				timeout: timeoutMsecsOrNil ]
+		ifGraphMissing: self emptyResult
+]
+
+{ #category : 'private' }
+FkGraphDb >> tryReturn: returningBlock ifGraphMissing: fallbackValue [
+	"Answer the value of returningBlock. GRAPH.RO_QUERY fails on a graph that has not been created yet
+	(GRAPH.QUERY would create it), so a read-only query against it answers fallbackValue instead. FalkorDB
+	gives that failure only the generic ERR prefix, so whether the graph exists is checked instead of
+	matching the version-dependent message."
+
+	^ returningBlock
+		on: RsGenericError
+		do: [ :ex |
+			self exists
+				ifTrue: [ ex pass ]
+				ifFalse: [ ex return: fallbackValue ] ]
+]
+
+{ #category : 'private' }
+FkGraphDb >> emptyResult [
+	^ FkQueryResult empty
 ]
 
 { #category : 'actions-nodes' }
@@ -1010,7 +1054,7 @@ FkGraphDb >> nodeAt: systemId [
 	n := 'n' asCypherIdentifier.
 	node := CyNode name: n.
 	query := CyQuery match: node where: (n getId equals: systemId) return: node.
-	result := self runCypher: query.
+	result := self runReadOnlyCypher: query.
 	^ self firstNodeOrNilFrom: result
 ]
 
@@ -1083,7 +1127,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder [
 		match: (CyNode name: node labels: (self labelsFor: labelOrLabels))
 		where: (whereClauseBuilder value: node)
 		return: node.
-	result := self runCypher: query.
+	result := self runReadOnlyCypher: query.
 	^ self nodesFrom: result
 ]
 
@@ -1098,7 +1142,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder orderBy: orde
 		orderBy: (orderByClauseBuilder value: node)
 		skip: skip
 		limit: limit.
-	result := self runCypher: query.
+	result := self runReadOnlyCypher: query.
 	^ self nodesFrom: result
 ]
 
@@ -1112,7 +1156,7 @@ FkGraphDb >> nodesLabeled: labelOrLabels where: whereClauseBuilder skip: skip li
 		return: node
 		skip: skip
 		limit: limit.
-	result := self runCypher: query.
+	result := self runReadOnlyCypher: query.
 	^ self nodesFrom: result
 ]
 

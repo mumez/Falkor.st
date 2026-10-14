@@ -95,7 +95,7 @@ FkGraphObject >> delete [
 	n := 'n' asCypherIdentifier.
 	element := self cypherElementWithIdentifier: n.
 	query := self baseQueryMatching: element withIdentifier: n.
-	query addDelete: element.
+	query addDelete: n.
 	self db runCypher: query.
 	isDeleted := true
 ]
@@ -160,6 +160,15 @@ FkGraphObject >> baseQueryMatching: element withIdentifier: anIdentifier [
 	comment."
 
 	^ CyQuery match: element where: (anIdentifier getId equals: self id)
+]
+
+{ #category : 'printing' }
+FkGraphObject >> printOn: aStream [
+	super printOn: aStream.
+	aStream
+		nextPutAll: '(id:';
+		print: (self rawGraphObject ifNotNil: [ :raw | raw id ]);
+		nextPut: $)
 ]
 
 { #category : 'accessing' }
