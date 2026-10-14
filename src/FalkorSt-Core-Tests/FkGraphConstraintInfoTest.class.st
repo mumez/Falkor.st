@@ -1,5 +1,5 @@
 "
-I test FkGraphConstraintInfo class >> allFromQueryResult:, the single place CALL db.constraints()
+I test FkGraphConstraintInfo class >> collectFromQueryResult:, the single place CALL db.constraints()
 records are mapped to FkGraphConstraintInfo. I need no FalkorDB instance; listing real constraints
 is covered by FkGraphEndpointTest.
 "
@@ -11,13 +11,13 @@ Class {
 }
 
 { #category : 'tests' }
-FkGraphConstraintInfoTest >> testAllFromQueryResultMapsEachRecord [
+FkGraphConstraintInfoTest >> testCollectFromQueryResultMapsEachRecord [
 	| result infos |
 	result := FkQueryResult new
 		setHeader: #('type' 'label')
 		records: #(#('UNIQUE' 'Person') #('MANDATORY' 'KNOWS'))
 		statistics: #().
-	infos := FkGraphConstraintInfo allFromQueryResult: result.
+	infos := FkGraphConstraintInfo collectFromQueryResult: result.
 	self assert: infos class equals: Array.
 	self assert: (infos collect: [ :each | each class ]) asArray equals: { FkGraphConstraintInfo. FkGraphConstraintInfo }.
 	self assert: (infos collect: [ :each | each entityName ]) asArray equals: #('Person' 'KNOWS').
@@ -25,6 +25,6 @@ FkGraphConstraintInfoTest >> testAllFromQueryResultMapsEachRecord [
 ]
 
 { #category : 'tests' }
-FkGraphConstraintInfoTest >> testAllFromQueryResultOnEmptyResultAnswersEmpty [
-	self assert: (FkGraphConstraintInfo allFromQueryResult: FkQueryResult empty) isEmpty
+FkGraphConstraintInfoTest >> testCollectFromQueryResultOnEmptyResultAnswersEmpty [
+	self assert: (FkGraphConstraintInfo collectFromQueryResult: FkQueryResult empty) isEmpty
 ]

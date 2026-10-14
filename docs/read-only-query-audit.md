@@ -46,11 +46,11 @@ Decision. This is the recommended approach, checked against the code. It was rev
 review so that the procedure names and the read-only CALL live only in Core:
 
 1. **Core: share the mapping.** A new abstract superclass `FkGraphProcedureRowInfo` holds the raw
-   record, `class >> fromRecord:` / `class >> allFromQueryResult:` and the shared
+   record, `class >> fromRecord:` / `class >> collectFromQueryResult:` and the shared
    `label` / `entityType` / `properties` / `status` accessors. `FkGraphIndexInfo` and
    `FkGraphConstraintInfo` subclass it and keep only their column-specific accessors.
 2. **Endpoint: go read-only, keep the raw error.** `graphIndexes:` becomes
-   `^ FkGraphIndexInfo allFromQueryResult: (self graphCallProcedure: graphName procedure: 'db.indexes' arguments: #() yield: nil readOnly: true)`.
+   `^ FkGraphIndexInfo collectFromQueryResult: (self graphCallProcedure: graphName procedure: 'db.indexes' arguments: #() yield: nil readOnly: true)`.
    `graphConstraints:` gets the same change. The endpoint stays a thin protocol layer and does not
    know about missing graphs, matching `#graphRoQuery:*`. It is the only place that knows the
    procedure names.
@@ -94,7 +94,7 @@ Doc follow-ups for phase 2 (done):
 - `FkGraphEndpoint`'s class comment now has one combined entry for `#graphIndexes:` /
   `#graphConstraints:` that says they are read-only and signal on a missing graph.
 - The FkGraphIndexInfo/FkGraphConstraintInfo comments now name FkQueryResult as the collaborator and
-  `allFromQueryResult:` as the key message. They do not mention FkGraphDb, because FalkorSt-Core
+  `collectFromQueryResult:` as the key message. They do not mention FkGraphDb, because FalkorSt-Core
   sits below FalkorSt-Objects. The class comments stay short (see CLAUDE.local.md).
 
 ### Change point for most other reads
@@ -116,7 +116,7 @@ None of the (a) items raise on zero records:
   nil.
 - `#nodesFrom:`, `#relationshipsFrom:` and `firstColumnValues collect:` answer an empty collection.
 - `existsOneHopPathsTyped:` uses `#oneValueIfNone: [ false ]`.
-- `allFromQueryResult:` answers an empty collection.
+- `collectFromQueryResult:` answers an empty collection.
 
 So no result-handling change is needed. No (a) method calls `records first` or
 `firstColumnValues first` directly.
@@ -149,8 +149,8 @@ So no result-handling change is needed. No (a) method calls `records first` or
 
 | Class | Selector | Current call | Cls | Planned change | Expected result on missing graph |
 |---|---|---|---|---|---|
-| FkGraphEndpoint | `graphIndexes:` | `graphCallProcedure:procedure:` (GRAPH.QUERY, CALL db.indexes()) | a | `graphCallProcedure:procedure:arguments: #() yield: nil readOnly: true` + `FkGraphIndexInfo allFromQueryResult:` | **raises `RsGenericError`**, graph not created |
-| FkGraphEndpoint | `graphConstraints:` | `graphCallProcedure:procedure:` (GRAPH.QUERY, CALL db.constraints()) | a | `...readOnly: true` + `FkGraphConstraintInfo allFromQueryResult:` | **raises `RsGenericError`**, graph not created |
+| FkGraphEndpoint | `graphIndexes:` | `graphCallProcedure:procedure:` (GRAPH.QUERY, CALL db.indexes()) | a | `graphCallProcedure:procedure:arguments: #() yield: nil readOnly: true` + `FkGraphIndexInfo collectFromQueryResult:` | **raises `RsGenericError`**, graph not created |
+| FkGraphEndpoint | `graphConstraints:` | `graphCallProcedure:procedure:` (GRAPH.QUERY, CALL db.constraints()) | a | `...readOnly: true` + `FkGraphConstraintInfo collectFromQueryResult:` | **raises `RsGenericError`**, graph not created |
 
 ### (a) Pure reads: FkGraphNode via its db (FalkorSt-Objects)
 
@@ -256,9 +256,9 @@ graph.
 
 | Test class | Selector | Asserts |
 |---|---|---|
-| FkGraphIndexInfoTest *(new, FalkorSt-Core-Tests, pure unit)* | `testAllFromQueryResultMapsEachRecord` | `allFromQueryResult:` on an FkQueryResult with a header and two records answers two FkGraphIndexInfo whose `label` comes from the mapped record. |
-| FkGraphIndexInfoTest | `testAllFromQueryResultOnEmptyResultAnswersEmpty` | `allFromQueryResult: (FkQueryResult empty)` is empty. |
-| FkGraphConstraintInfoTest *(new, FalkorSt-Core-Tests, pure unit)* | `testAllFromQueryResultMapsEachRecord` / `testAllFromQueryResultOnEmptyResultAnswersEmpty` | Same as above for FkGraphConstraintInfo. |
+| FkGraphIndexInfoTest *(new, FalkorSt-Core-Tests, pure unit)* | `testCollectFromQueryResultMapsEachRecord` | `collectFromQueryResult:` on an FkQueryResult with a header and two records answers two FkGraphIndexInfo whose `label` comes from the mapped record. |
+| FkGraphIndexInfoTest | `testCollectFromQueryResultOnEmptyResultAnswersEmpty` | `collectFromQueryResult: (FkQueryResult empty)` is empty. |
+| FkGraphConstraintInfoTest *(new, FalkorSt-Core-Tests, pure unit)* | `testCollectFromQueryResultMapsEachRecord` / `testCollectFromQueryResultOnEmptyResultAnswersEmpty` | Same as above for FkGraphConstraintInfo. |
 | FkGraphEndpointTest | `testGraphIndexesOnAMissingGraphSignalsWithoutCreatingIt` | `self should: [ endpoint graphIndexes: graphName ] raise: RsGenericError`; afterwards `endpoint graphList` does not include graphName. |
 | FkGraphEndpointTest | `testGraphConstraintsOnAMissingGraphSignalsWithoutCreatingIt` | Same for `graphConstraints:`. |
 | FkGraphDbTest | `testIndexesAndConstraintsOnAGraphThatDoesNotExistYetAnswerEmptyWithoutCreatingIt` | `deny: db exists`; `db indexes isEmpty`; `db constraints isEmpty`; `deny: db exists`. (Existing `testCreateIndexByListsTheIndex` / `testCreateConstraintByListsTheConstraint` still cover the non-empty path.) |

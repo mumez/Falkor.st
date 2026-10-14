@@ -1,5 +1,5 @@
 "
-I test FkGraphIndexInfo class >> allFromQueryResult:, the single place CALL db.indexes() records
+I test FkGraphIndexInfo class >> collectFromQueryResult:, the single place CALL db.indexes() records
 are mapped to FkGraphIndexInfo. I need no FalkorDB instance; listing real indexes is covered by
 FkGraphEndpointTest.
 "
@@ -11,13 +11,13 @@ Class {
 }
 
 { #category : 'tests' }
-FkGraphIndexInfoTest >> testAllFromQueryResultMapsEachRecord [
+FkGraphIndexInfoTest >> testCollectFromQueryResultMapsEachRecord [
 	| result infos |
 	result := FkQueryResult new
 		setHeader: #('label' 'entitytype')
 		records: #(#('Person' 'NODE') #('KNOWS' 'RELATIONSHIP'))
 		statistics: #().
-	infos := FkGraphIndexInfo allFromQueryResult: result.
+	infos := FkGraphIndexInfo collectFromQueryResult: result.
 	self assert: infos class equals: Array.
 	self assert: (infos collect: [ :each | each class ]) asArray equals: { FkGraphIndexInfo. FkGraphIndexInfo }.
 	self assert: (infos collect: [ :each | each label ]) asArray equals: #('Person' 'KNOWS').
@@ -25,6 +25,6 @@ FkGraphIndexInfoTest >> testAllFromQueryResultMapsEachRecord [
 ]
 
 { #category : 'tests' }
-FkGraphIndexInfoTest >> testAllFromQueryResultOnEmptyResultAnswersEmpty [
-	self assert: (FkGraphIndexInfo allFromQueryResult: FkQueryResult empty) isEmpty
+FkGraphIndexInfoTest >> testCollectFromQueryResultOnEmptyResultAnswersEmpty [
+	self assert: (FkGraphIndexInfo collectFromQueryResult: FkQueryResult empty) isEmpty
 ]

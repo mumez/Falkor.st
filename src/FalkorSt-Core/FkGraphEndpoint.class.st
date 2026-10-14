@@ -284,7 +284,7 @@ FkGraphEndpoint >> graphConstraintDropWith: aFkGraphConstraint on: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphConstraints: graphName [
-	^ FkGraphConstraintInfo allFromQueryResult: (self
+	^ FkGraphConstraintInfo collectFromQueryResult: (self
 		graphCallProcedure: graphName
 		procedure: 'db.constraints'
 		arguments: #()
@@ -415,7 +415,7 @@ FkGraphEndpoint >> graphIndexDropWith: aFkGraphIndex on: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphIndexes: graphName [
-	^ FkGraphIndexInfo allFromQueryResult: (self
+	^ FkGraphIndexInfo collectFromQueryResult: (self
 		graphCallProcedure: graphName
 		procedure: 'db.indexes'
 		arguments: #()

@@ -13,7 +13,7 @@ Collaborators:
 - FkQueryResult: the procedure result whose mapped records I am built from
 
 Public API and Key Messages:
-- class >> allFromQueryResult: - build one instance per record of a procedure result
+- class >> collectFromQueryResult: - build one instance per record of a procedure result
 - #label / #entityType / #properties / #status
 "
 Class {
@@ -27,7 +27,7 @@ Class {
 }
 
 { #category : 'instance creation' }
-FkGraphProcedureRowInfo class >> allFromQueryResult: aFkQueryResult [
+FkGraphProcedureRowInfo class >> collectFromQueryResult: aFkQueryResult [
 	^ (aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]) asArray
 ]
 
