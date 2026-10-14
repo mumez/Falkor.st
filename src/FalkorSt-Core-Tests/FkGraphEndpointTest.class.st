@@ -617,6 +617,13 @@ FkGraphEndpointTest >> testGraphIndexesEmptyWhenGraphHasNoIndexes [
 	self assert: (self endpoint graphIndexes: self graphName) isEmpty
 ]
 
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphIndexesOnAMissingGraphSignalsWithoutCreatingIt [
+	self deny: (self endpoint graphList includes: self graphName).
+	self should: [ self endpoint graphIndexes: self graphName ] raise: RsGenericError.
+	self deny: (self endpoint graphList includes: self graphName)
+]
+
 { #category : 'private' }
 FkGraphEndpointTest >> assertCreatedIndexSpecsAreListed [
 	self assertListedProperty: 'email' type: 'RANGE' label: 'Person' entityType: 'NODE'.
@@ -718,6 +725,13 @@ FkGraphEndpointTest >> assertConstraintOperationalType: aType entityType: anEnti
 FkGraphEndpointTest >> testGraphConstraintsEmptyWhenGraphHasNoConstraints [
 	self endpoint graphQuery: self graphName cypher: 'CREATE (:Person)'.
 	self assert: (self endpoint graphConstraints: self graphName) isEmpty
+]
+
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConstraintsOnAMissingGraphSignalsWithoutCreatingIt [
+	self deny: (self endpoint graphList includes: self graphName).
+	self should: [ self endpoint graphConstraints: self graphName ] raise: RsGenericError.
+	self deny: (self endpoint graphList includes: self graphName)
 ]
 
 { #category : 'private' }

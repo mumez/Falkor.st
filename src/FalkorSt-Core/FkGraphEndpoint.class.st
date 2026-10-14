@@ -88,10 +88,8 @@ Public API and Key Messages:
   evaluating the caller's block, e.g. [ :i | i range; node: 'Person'; props: #('email') ]
 - #graphIndexDropWith:on: / #graphIndexDropBy:on: - drop the index described by an FkGraphIndex,
   running its DROP INDEX Cypher via GRAPH.QUERY
-- #graphIndexes: - list a graph's indexes via CALL db.indexes(), answering an OrderedCollection
-  of FkGraphIndexInfo
-- #graphConstraints: - list a graph's constraints via CALL db.constraints(), answering an
-  OrderedCollection of FkGraphConstraintInfo
+- #graphIndexes: / #graphConstraints: - list a graph's FkGraphIndexInfo / FkGraphConstraintInfo
+  via read-only CALL db.indexes() / db.constraints(); signal RsGenericError on a missing graph
 - #graphCallProcedure:procedure:arguments:yield:readOnly: - call a stored procedure
   (equivalent to falkordb-py's call_procedure), binding arguments as query parameters rather
   than embedding their values
@@ -286,8 +284,12 @@ FkGraphEndpoint >> graphConstraintDropWith: aFkGraphConstraint on: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphConstraints: graphName [
-	^ (self graphCallProcedure: graphName procedure: 'db.constraints') mappedRecords collect: [ :record |
-		FkGraphConstraintInfo fromRecord: record ]
+	^ FkGraphConstraintInfo collectFromQueryResult: (self
+		graphCallProcedure: graphName
+		procedure: 'db.constraints'
+		arguments: #()
+		yield: nil
+		readOnly: true)
 ]
 
 { #category : 'commands-graph' }
@@ -413,8 +415,12 @@ FkGraphEndpoint >> graphIndexDropWith: aFkGraphIndex on: graphName [
 
 { #category : 'commands-graph' }
 FkGraphEndpoint >> graphIndexes: graphName [
-	^ (self graphCallProcedure: graphName procedure: 'db.indexes') mappedRecords collect: [ :record |
-		FkGraphIndexInfo fromRecord: record ]
+	^ FkGraphIndexInfo collectFromQueryResult: (self
+		graphCallProcedure: graphName
+		procedure: 'db.indexes'
+		arguments: #()
+		yield: nil
+		readOnly: true)
 ]
 
 { #category : 'commands-graph' }

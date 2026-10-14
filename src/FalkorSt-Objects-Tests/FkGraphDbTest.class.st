@@ -1187,6 +1187,74 @@ FkGraphDbTest >> testReadsOnAGraphThatDoesNotExistYetAnswerEmptyResults [
 ]
 
 { #category : 'tests' }
+FkGraphDbTest >> testIndexesAndConstraintsOnAGraphThatDoesNotExistYetAnswerEmptyWithoutCreatingIt [
+	| db |
+	db := self db.
+	self deny: db exists.
+	self assert: db indexes equals: #().
+	self assert: db constraints equals: #().
+	self deny: db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testNodeReadsOnAGraphThatDoesNotExistYetAnswerNilOrEmptyWithoutCreatingIt [
+	"Id 1, not 0: on a freshly created empty graph FalkorDB answers a phantom node for id(n) = 0."
+
+	| db positiveAge |
+	db := self db.
+	positiveAge := [ :n | (n @ 'age') greaterThan: 0 ].
+	self deny: db exists.
+	self assert: (db nodeAt: 1) isNil.
+	self assert: (db nodesLabeled: 'Person') isEmpty.
+	self assert: (db nodesLabeled: 'Person' having: 'name' value: 'Alice') isEmpty.
+	self assert: (db nodesLabeled: 'Person' havingAll: { 'name' -> 'Alice' }) isEmpty.
+	self assert: (db nodesLabeled: 'Person' where: positiveAge) isEmpty.
+	self assert: (db nodesLabeled: 'Person' where: positiveAge skip: 0 limit: 1) isEmpty.
+	self assert:
+		(db nodesLabeled: 'Person' where: positiveAge orderBy: [ :n | (n @ 'age') asc ] skip: 0 limit: 1) isEmpty.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testRelationshipReadsOnAGraphThatDoesNotExistYetAnswerNilOrEmptyWithoutCreatingIt [
+	| db |
+	db := self db.
+	self deny: db exists.
+	self assert: (db relationshipAt: 1) isNil.
+	self assert: (db relationshipsTyped: 'KNOWS') isEmpty.
+	self assert: (db relationshipsTyped: 'KNOWS' having: 'since' value: 2020) isEmpty.
+	self assert: (db relationshipsTyped: 'KNOWS' havingAll: { 'since' -> 2020 }) isEmpty.
+	self assert: (db relationshipsTyped: 'KNOWS' where: [ :r | (r @ 'weight') greaterThan: 0 ]) isEmpty.
+	self assert: (db
+			 relationshipsTyped: 'KNOWS'
+			 where: [ :r | (r @ 'weight') greaterThan: 0 ]
+			 orderBy: [ :r | (r @ 'weight') asc ]
+			 skip: 0
+			 limit: 1) isEmpty.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
+FkGraphDbTest >> testOneHopPathReadsOnAGraphThatDoesNotExistYetAnswerEmptyOrFalseWithoutCreatingIt [
+	"The returning: and short exists variants delegate to the full returnIn: and havingAll: ones."
+
+	| db |
+	db := self db.
+	self deny: db exists.
+	self assert: (db
+			 oneHopPathsTyped: 'KNOWS'
+			 direction: #out
+			 from: 1
+			 havingAll: #()
+			 endNodeWithLabels: #('Person')
+			 havingAll: #()
+			 whereIn: [ :s :r :e | nil ]
+			 returning: [ :path | path ]) isEmpty.
+	self deny: (db existsOneHopPathsTyped: 'KNOWS' direction: #out from: 1 whereIn: [ :s :r :e | nil ]).
+	self deny: db exists
+]
+
+{ #category : 'tests' }
 FkGraphDbTest >> testReadOnlyQueryErrorsOtherThanAMissingGraphStillSignal [
 	| db |
 	db := self db.

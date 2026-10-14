@@ -82,6 +82,21 @@ FkGraphRelationshipTest >> testOwnAndOtherResolveCorrectlyForInRelationship [
 ]
 
 { #category : 'tests' }
+FkGraphRelationshipTest >> testNodeNavigationOnARelationshipOfADroppedGraphAnswersNilWithoutRecreatingIt [
+	| db alice rel |
+	db := self db.
+	alice := (self createAliceKnowsBobIn: db) first.
+	rel := alice outRelationships first.
+	db drop.
+	self deny: db exists.
+	self assert: rel startNode isNil.
+	self assert: rel endNode isNil.
+	self assert: rel otherNode isNil.
+	self assert: rel ownNode isNil.
+	self deny: db exists
+]
+
+{ #category : 'tests' }
 FkGraphRelationshipTest >> testOtherNodeSignalsUnknownDirectionWhenNavigationOriginIsNotSet [
 	| db people alice rel |
 	db := self db.
