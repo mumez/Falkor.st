@@ -118,7 +118,7 @@ FkQueryResult class >> decodeCompactProperties: rawPropertyTriples resolvedBy: a
 
 { #category : 'private-compact' }
 FkQueryResult class >> decodeCompactRecord: rawRecord resolvedBy: anEndpoint graph: graphName [
-	^ rawRecord collect: [ :rawCell | self decodeCompactCell: rawCell resolvedBy: anEndpoint graph: graphName ]
+	^ (rawRecord collect: [ :rawCell | self decodeCompactCell: rawCell resolvedBy: anEndpoint graph: graphName ]) asArray
 ]
 
 { #category : 'private-compact' }
@@ -328,9 +328,9 @@ FkQueryResult >> recordsDo: aBlock [
 
 { #category : 'private' }
 FkQueryResult >> setHeader: aHeaderCollection records: aRecordsCollection statistics: aStatisticsCollection [
-	self header: aHeaderCollection.
-	self records: aRecordsCollection.
-	self statistics: aStatisticsCollection
+	self header: aHeaderCollection asArray.
+	self records: aRecordsCollection asArray.
+	self statistics: aStatisticsCollection asArray
 ]
 
 { #category : 'accessing' }
