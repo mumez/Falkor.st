@@ -14,6 +14,8 @@ Collaborators:
 
 Public API and Key Messages:
 - #default - class-side accessor for the shared, lazily-created instance (inherited from SkSettings)
+- #defaultCopied - class-side; answers a new instance initialized from #default, so it can be
+  customized without affecting the shared default
 - #targetUrl / #targetUrl: - the Redis/FalkorDB connection URL
 - #queryTimeoutMsecs / #queryTimeoutMsecs: - the default GRAPH.QUERY/GRAPH.RO_QUERY TIMEOUT in
   milliseconds
@@ -24,6 +26,17 @@ Class {
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
 }
+
+{ #category : 'instance creation' }
+FkSettings class >> defaultCopied [
+	^ self new initFrom: self default
+]
+
+{ #category : 'initialization' }
+FkSettings >> initFrom: otherSettings [
+	otherSettings settingsDict keysAndValuesDo: [ :key :value |
+		self settingsDict at: key put: value ]
+]
 
 { #category : 'accessing' }
 FkSettings >> targetUrl [

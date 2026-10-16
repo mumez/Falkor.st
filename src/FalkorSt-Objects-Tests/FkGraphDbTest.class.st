@@ -43,6 +43,16 @@ FkGraphDbTest >> tearDown [
 ]
 
 { #category : 'tests' }
+FkGraphDbTest >> testSettingsChangesDoNotAffectFkSettingsDefault [
+	| originalTimeout db |
+	originalTimeout := FkSettings default queryTimeoutMsecs.
+	db := self db.
+	db settings queryTimeoutMsecs: originalTimeout + 1234.
+	self assert: db settings queryTimeoutMsecs equals: originalTimeout + 1234.
+	self assert: FkSettings default queryTimeoutMsecs equals: originalTimeout
+]
+
+{ #category : 'tests' }
 FkGraphDbTest >> testEndpointAnswersFkGraphEndpoint [
 	| db |
 	db := self db.

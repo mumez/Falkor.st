@@ -92,7 +92,8 @@ alice relateTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.
 ### Connection and Settings
 
 `FkSettings default` holds the shared configuration. `FkGraphDb named:` uses it to create its own
-connection the first time one is needed.
+connection the first time one is needed. Each `FkGraphDb` takes a copy of these defaults the first
+time it reads its settings, so later changes to `FkSettings default` don't affect it.
 
 ```smalltalk
 FkSettings default targetUrl: 'sync://falkordb.example.com:6379'.
@@ -115,7 +116,7 @@ You can also give one graph its own settings, without touching the shared defaul
 
 ```smalltalk
 db := FkGraphDb named: 'social'.
-db settings: (FkSettings new queryTimeoutMsecs: 1000; yourself).
+db settings queryTimeoutMsecs: 1000.
 ```
 
 ### Nodes
