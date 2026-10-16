@@ -164,7 +164,7 @@ FkGraphEndpoint >> constraintCommandArgsFor: graphName type: constraintType enti
 { #category : 'private' }
 FkGraphEndpoint >> cypherParamsClauseFor: paramsDictionary [
 	^ String streamContents: [ :s |
-		paramsDictionary keysAndValuesDo: [ :key :value |
+		paramsDictionary asDictionary keysAndValuesDo: [ :key :value |
 			s
 				nextPutAll: key;
 				nextPut: $=;

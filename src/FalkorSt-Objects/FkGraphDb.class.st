@@ -21,7 +21,7 @@ Collaborators:
 - FkSettings: supplies #targetUrl when I lazily create my own stick
 
 Public API and Key Messages:
-- FkGraphDb class >> named: - lazily creates and connects a stick from FkSettings default targetUrl
+- FkGraphDb class >> named: - lazily creates and connects a stick from FkSettings defaultCopied targetUrl
 - FkGraphDb class >> on:named: - uses an already-connected stick; nil graph name defaults to
   #defaultName ('default')
 - #endpoint - self stick endpoint
@@ -1172,7 +1172,7 @@ FkGraphDb >> valuesArgumentsFor: argsDict [
 
 { #category : 'accessing' }
 FkGraphDb >> settings [
-	^ settings ifNil: [ settings := FkSettings default ]
+	^ settings ifNil: [ settings := FkSettings defaultCopied ]
 ]
 
 { #category : 'accessing' }

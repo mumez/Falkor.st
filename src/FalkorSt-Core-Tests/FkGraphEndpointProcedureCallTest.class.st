@@ -111,7 +111,7 @@ FkGraphEndpointProcedureCallTest >> testGraphCallProcedureYieldSubsetLimitsResul
 		arguments: #()
 		yield: #('name' 'mode')
 		readOnly: false.
-	self assert: result header equals: #('name' 'mode') asOrderedCollection
+	self assert: result header equals: #('name' 'mode')
 ]
 
 { #category : 'tests' }

@@ -92,7 +92,8 @@ alice relateTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.
 ### Connection and Settings
 
 `FkSettings default` holds the shared configuration. `FkGraphDb named:` uses it to create its own
-connection the first time one is needed.
+connection the first time one is needed. Each `FkGraphDb` takes a copy of these defaults the first
+time it reads its settings, so later changes to `FkSettings default` don't affect it.
 
 ```smalltalk
 FkSettings default targetUrl: 'sync://falkordb.example.com:6379'.
@@ -115,7 +116,7 @@ You can also give one graph its own settings, without touching the shared defaul
 
 ```smalltalk
 db := FkGraphDb named: 'social'.
-db settings: (FkSettings new queryTimeoutMsecs: 1000; yourself).
+db settings queryTimeoutMsecs: 1000.
 ```
 
 ### Nodes
@@ -131,7 +132,7 @@ db mergeNodeLabeled: 'Person' properties: { 'name'->'Alice'. 'age'->30 }.  "Alic
 "Read"
 carol id.
 carol labels.          "an OrderedCollection('Person')"
-carol properties.
+carol properties.      "a Dictionary('age'->35 'name'->'Carol' )"
 carol @ 'name'.        "'Carol' - shortcut for #propertyAt:"
 db nodeAt: carol id.   "answers nil if there is no such node"
 
@@ -192,6 +193,7 @@ db countRelationshipsTyped: 'KNOWS'.
 "Delete"
 follows delete.
 db deleteRelationshipsTyped: 'FOLLOWS'.
+db allRelationshipTypes.
 ```
 
 ### Traversal
@@ -200,18 +202,18 @@ Every node can navigate its one-hop neighborhood. `out...`, `in...`, and the pla
 direction) variants share the same set of filters:
 
 ```smalltalk
-alice outRelationships.
-alice outRelationshipsTyped: 'KNOWS'.
+alice outRelationships.              "an OrderedCollection(a FkGraphRelationship(id:0))"
+alice outRelationshipsTyped: 'KNOWS'. 
 alice outRelationshipsTyped: 'KNOWS' endNodeHaving: 'name' value: 'Bob'.
-alice inRelationshipsTyped: 'KNOWS'.
+alice inRelationshipsTyped: 'KNOWS'. "an OrderedCollection()"
 alice relationshipsTyped: 'KNOWS' where: [ :s :r :e | (r @ 'since') > 2019 ].
 
-alice existsOutRelationshipTyped: 'KNOWS'.  "true / false, nothing is fetched"
-alice types.                                "a Set of relationship types"
+alice existsOutRelationshipTyped: 'KNOWS'.  "true"
+alice types.                                "a Set('KNOWS')"
 
 "Whole one-hop paths (FkGraphPath: startNode, relationships, endNode)"
 (alice outOneHopPathsTyped: 'KNOWS' where: [ :s :r :e | (e @ 'age') < 30 ])
-   collect: [ :path | path endNode name ].
+   collect: [ :path | path endNode name ].  "an OrderedCollection('Bob')"
 ```
 
 When you need full control over the query, `FkGraphDb` exposes the underlying query directly:
@@ -235,13 +237,16 @@ For anything the object API doesn't cover, run Cypher directly. Always pass valu
 (`$name`) rather than concatenating them into the query string.
 
 ```smalltalk
-db runCypher: 'UNWIND range(1, 5) AS n RETURN n*n'.
+result := db runCypher: 'UNWIND range(1, 5) AS n RETURN n*n'. "a FkQueryResult"
+result firstColumnValues. "#(1 4 9 16 25)"
 
-db runCypher: 'MATCH (p:Person) WHERE p.age > $minAge RETURN p.name, p.age'
-   arguments: { 'minAge'->20 } asDictionary.
+result := db runCypher: 'MATCH (p:Person) WHERE p.age > $minAge RETURN p.name, p.age'
+   arguments: { 'minAge'->20 }.
+result records. "#(#('Alice' 30) #('Bob' 25))"
 
 "GRAPH.RO_QUERY - rejected by the server if the query tries to write"
-db runReadOnlyCypher: 'MATCH (p:Person) RETURN count(p)'.
+result := db runReadOnlyCypher: 'MATCH (p:Person) RETURN count(p)'.
+result oneValue. "3"
 
 "Override the query timeout (milliseconds) for this call only"
 db runCypher: 'MATCH (a)-[*]->(b) RETURN count(b)'
@@ -256,10 +261,11 @@ p := 'p' asCypherIdentifier.
 
 query := CyQuery
    match: (CyNode name: p labels: #('Person'))
-   where: ((p @ 'age') greaterThan: 'minAge' asCypherParameter)
+   where: ((p @ 'age') > 'minAge' asCypherParameter)
    return: (p @ 'name').
 
-db runCypher: query arguments: { 'minAge'->18 } asDictionary.
+result := db runCypher: query arguments: { 'minAge'->18 }.
+result firstColumnValues. "#('Alice' 'Bob')"
 ```
 
 ### Query Results
@@ -269,14 +275,15 @@ db runCypher: query arguments: { 'minAge'->18 } asDictionary.
 ```smalltalk
 result := db runCypher: 'MATCH (p:Person) RETURN p.name AS name, p.age AS age'.
 
-result header.             "an OrderedCollection('name' 'age')"
-result records.            "rows: each an OrderedCollection of values"
-result mappedRecords.      "rows as column name -> value Dictionaries"
-result valuesAt: 'name'.   "all values of one column"
-result firstColumnValues.
+result header.             "#('name' 'age')"
+result records.            "#(#('Alice' 30) #('Bob' 25) #('Dave' nil)) - rows: each an Array of values"
+result mappedRecords.      "an Array(a Dictionary('age'->30 'name'->'Alice' ) a Dictionary('age'->25
+'name'->'Bob' ) a Dictionary('age'->nil 'name'->'Dave' )) - rows as column name -> value Dictionaries"
+result valuesAt: 'name'.   "#('Alice' 'Bob' 'Dave') - all values of 'name' column"
+result firstColumnValues.  "#('Alice' 'Bob' 'Dave') - all values of the first column"
 result statistics.         "e.g. 'Nodes created: 1', 'Query internal execution time: ...'"
 
-(db runCypher: 'MATCH (p:Person) RETURN count(p)') oneValue.  "a single value, or nil"
+(db runCypher: 'MATCH (p:Person) RETURN count(p)') oneValue.  "3 - a single value, or nil"
 ```
 
 Values are decoded as follows:

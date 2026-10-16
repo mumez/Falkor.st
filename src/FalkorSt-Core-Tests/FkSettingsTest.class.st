@@ -37,3 +37,22 @@ FkSettingsTest >> testExplicitQueryTimeoutMsecs [
 	settings queryTimeoutMsecs: 5000.
 	self assert: settings queryTimeoutMsecs equals: 5000
 ]
+
+{ #category : 'tests' }
+FkSettingsTest >> testDefaultCopiedCopiesDefaultValues [
+	| originalTargetUrl |
+	originalTargetUrl := FkSettings default targetUrl.
+	[
+		FkSettings default targetUrl: 'sync://example.com:1234'.
+		self assert: FkSettings defaultCopied targetUrl equals: 'sync://example.com:1234' ]
+		ensure: [ FkSettings default targetUrl: originalTargetUrl ]
+]
+
+{ #category : 'tests' }
+FkSettingsTest >> testDefaultCopiedDoesNotAffectDefault [
+	| originalTimeout copied |
+	originalTimeout := FkSettings default queryTimeoutMsecs.
+	copied := FkSettings defaultCopied.
+	copied queryTimeoutMsecs: originalTimeout + 1234.
+	self assert: FkSettings default queryTimeoutMsecs equals: originalTimeout
+]
