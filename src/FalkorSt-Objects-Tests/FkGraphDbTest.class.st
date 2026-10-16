@@ -185,7 +185,7 @@ FkGraphDbTest >> testCallProcedureArgumentsYieldTimeoutWithGenerousTimeoutSuccee
 	db := self db.
 	db runCypher: 'CREATE (:Person)'.
 	result := db callProcedure: 'db.labels' arguments: #() yield: 'label' timeout: 10000.
-	self assert: result header equals: #('label') asOrderedCollection.
+	self assert: result header equals: #('label').
 	self assert: result records first first equals: 'Person'
 ]
 
