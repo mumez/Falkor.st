@@ -333,7 +333,7 @@ Arguments are bound as query parameters, never inlined into the Cypher string.
 ```smalltalk
 "Execution plan, without running the query (GRAPH.EXPLAIN)"
 db explain: 'MATCH (p:Person) WHERE p.age > $minAge RETURN p'
-   arguments: { 'minAge'->20 } asDictionary.
+   arguments: { 'minAge'->20 }.
 
 "Run the query and report per-operation records and timings (GRAPH.PROFILE)"
 db profile: 'MATCH (p:Person) RETURN p'.
@@ -407,11 +407,11 @@ stick connect.
 endpoint := stick endpoint.
 
 result := endpoint graphQuery: 'social' cypher: 'CREATE (p:Person {name: ''Alice''}) RETURN p'.
-result records first first.   "an FkNode"
+result oneValue.   "an FkNode"
 
 endpoint graphQuery: 'social'
    cypher: 'MATCH (p:Person {name: $name}) RETURN p'
-   params: { 'name'->'Alice' } asDictionary.
+   params: { 'name'->'Alice' }.
 endpoint graphRoQuery: 'social' cypher: 'MATCH (p) RETURN count(p)'.
 
 ```
