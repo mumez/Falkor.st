@@ -7,14 +7,14 @@ Responsibility:
   superclass exposes
 
 Collaborators:
-- FkGraphProcedureRowInfo: my superclass, which builds me from a db.constraints() result
+- FkGraphSchemaRuleInfo: my superclass, which builds me from a db.constraints() result
 
 Public API and Key Messages:
 - #constraintType / #entityType / #entityName / #properties / #status
 "
 Class {
 	#name : 'FkGraphConstraintInfo',
-	#superclass : 'FkGraphProcedureRowInfo',
+	#superclass : 'FkGraphSchemaRuleInfo',
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
 }
