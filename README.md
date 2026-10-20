@@ -124,7 +124,7 @@ db settings queryTimeoutMsecs: 1000.
 ```smalltalk
 "Create"
 carol := db createNodeLabeled: 'Person' properties: { 'name'->'Carol'. 'age'->35 }.
-db createNodeLabeled: #('Person' 'Employee') properties: { 'name'->'Dave' }.
+dave := db createNodeLabeled: #('Person' 'Employee') properties: { 'name'->'Dave'. 'age'->18 }.
 
 "Create only if no identical node exists yet (MERGE)"
 db mergeNodeLabeled: 'Person' properties: { 'name'->'Alice'. 'age'->30 }.  "Alice already exists: answers her"
@@ -137,28 +137,34 @@ carol @ 'name'.        "'Carol' - shortcut for #propertyAt:"
 db nodeAt: carol id.   "answers nil if there is no such node"
 
 "Find"
-db nodesLabeled: 'Person'.
+people := db nodesLabeled: 'Person'.
+people collect: #name.    "#('Alice' 'Bob' 'Carol' 'Dave')"
 db nodesLabeled: 'Person' having: 'name' value: 'Alice'.
 db nodesLabeled: 'Person' havingAll: { 'name'->'Alice'. 'age'->30 }.
 db nodesLabeled: 'Person' where: [ :n | (n @ 'age') > 20 ].
-db nodesLabeled: 'Person'
+people := db nodesLabeled: 'Person'
    where: [ :n | (n @ 'age') > 20 ]
    orderBy: [ :n | (n @ 'age') asc ]
    skip: 0
    limit: 10.
-db countNodesLabeled: 'Person'.
+people collect: [:each | each properties]. 
+    "an Array(a Dictionary('age'->25 'name'->'Bob' ) a Dictionary('age'->30 'name'->'Alice' ) a Dictionary('age'->35 'name'->'Carol' ))"
+db countNodesLabeled: 'Person'. "4"
 
 "Update"
 carol propertyAt: 'age' put: 36.
+carol properties.
 carol mergeProperties: { 'city'->'Tokyo' }.             "add or overwrite some properties"
 carol properties: { 'name'->'Carol'. 'age'->36 }.       "replace all properties"
 carol removePropertyAt: 'city'.
 carol addLabel: 'Employee'.
+carol labels.
 carol removeLabel: 'Employee'.
 
 "Delete"
 carol delete.
-db deleteNodesLabeled: 'Person' where: [ :n | (n @ 'age') < 18 ].
+db deleteNodesLabeled: 'Person' where: [ :n | (n @ 'age') < 20 ].
+db countNodesLabeled: 'Person'. "2"
 ```
 
 Each mutator on a node runs right away and then reloads the node, so its local state always
@@ -319,7 +325,7 @@ db dropIndexBy: [ :i | i range; node: 'Person'; props: #('name') ].
 ```
 
 If a required part (kind, entity, or properties, plus `dimension:` for a vector index) is missing,
-an `RsError` is signaled before anything is sent to the server.
+an `RsError invalidArguments` is signaled before anything is sent to the server.
 
 ### Constraints
 
