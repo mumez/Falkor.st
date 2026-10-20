@@ -464,6 +464,17 @@ the same tests with [smalltalkCI](https://github.com/hpi-swa/smalltalkCI) agains
 (Neo4j). It covers load and CRUD latency/throughput and container memory, and explains how to
 reproduce the numbers with the opt-in `Benchmarks` group.
 
+In short, FalkorDB is much lighter than Neo4j and faster in most operations:
+
+- **Writes** (create/update/delete) took about 0.9–2.1 ms per call, vs 4.6–12.9 ms on Neo4j. Bulk
+  loading 150,000 entities was about 7× faster (175 s vs 1,285 s).
+- **Reads** (lookup by id or indexed property, count, 1-hop traversal) were about 1.3–3.6× faster.
+  The only exception was an unindexed filter with `LIMIT`, where Neo4j won.
+- **Memory**: the FalkorDB container used about 75 MiB when empty, vs about 1.5 GiB for Neo4j
+  (with its JVM heap and page cache settings).
+
+These are results from a single machine. See the page for the environment and caveats.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
