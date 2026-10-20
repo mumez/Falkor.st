@@ -365,6 +365,36 @@ db deleteAll.   "delete all nodes and relationships; indexes and constraints rem
 db drop.        "delete the whole graph, including indexes and constraints"
 ```
 
+### Connection and Settings
+
+`FkSettings default` holds the shared configuration. `FkGraphDb named:` uses it to create its own
+connection the first time one is needed. Each `FkGraphDb` takes a copy of these defaults the first
+time it reads its settings, so later changes to `FkSettings default` don't affect it.
+
+```smalltalk
+FkSettings default targetUrl: 'sync://falkordb.example.com:6379'.
+FkSettings default queryTimeoutMsecs: 5000. "default TIMEOUT for queries; 0 = server default"
+
+db := FkGraphDb named: 'social'.
+```
+
+To share one connection between several graphs, connect a stick yourself and pass it in:
+
+```smalltalk
+stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
+stick connect.
+
+social := FkGraphDb on: stick named: 'social'.
+movies := FkGraphDb on: stick named: 'movies'.
+```
+
+You can also give one graph its own settings, without touching the shared defaults:
+
+```smalltalk
+db := FkGraphDb named: 'social'.
+db settings queryTimeoutMsecs: 1000.
+```
+
 ## Low-Level API
 
 `FkGraphEndpoint` maps directly onto FalkorDB's
@@ -396,36 +426,6 @@ endpoint graphConfigGetAll.
 endpoint graphConfigSet: { 'TIMEOUT_DEFAULT'->5000 } asDictionary.
 endpoint graphInfo.
 endpoint graphInfo: [ :opts | opts showRunningQueries; showWaitingQueries ].
-```
-
-### Connection and Settings
-
-`FkSettings default` holds the shared configuration. `FkGraphDb named:` uses it to create its own
-connection the first time one is needed. Each `FkGraphDb` takes a copy of these defaults the first
-time it reads its settings, so later changes to `FkSettings default` don't affect it.
-
-```smalltalk
-FkSettings default targetUrl: 'sync://falkordb.example.com:6379'.
-FkSettings default queryTimeoutMsecs: 5000. "default TIMEOUT for queries; 0 = server default"
-
-db := FkGraphDb named: 'social'.
-```
-
-To share one connection between several graphs, connect a stick yourself and pass it in:
-
-```smalltalk
-stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
-stick connect.
-
-social := FkGraphDb on: stick named: 'social'.
-movies := FkGraphDb on: stick named: 'movies'.
-```
-
-You can also give one graph its own settings, without touching the shared defaults:
-
-```smalltalk
-db := FkGraphDb named: 'social'.
-db settings queryTimeoutMsecs: 1000.
 ```
 
 ## User-Defined Functions (`FalkorSt-Udf`)
