@@ -28,3 +28,10 @@ FkGraphConstraintInfoTest >> testCollectFromQueryResultMapsEachRecord [
 FkGraphConstraintInfoTest >> testCollectFromQueryResultOnEmptyResultAnswersEmpty [
 	self assert: (FkGraphConstraintInfo collectFromQueryResult: FkQueryResult empty) isEmpty
 ]
+
+{ #category : 'tests - printing' }
+FkGraphConstraintInfoTest >> testPrintStringShowsRawRecordAsSton [
+	| info |
+	info := FkGraphConstraintInfo fromRecord: (Dictionary new at: 'type' put: 'UNIQUE'; yourself).
+	self assert: info printString equals: 'a FkGraphConstraintInfo({''type'':''UNIQUE''})'
+]
