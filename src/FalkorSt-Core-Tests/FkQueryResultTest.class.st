@@ -229,3 +229,43 @@ FkQueryResultTest >> testRecordsDoEvaluatesNothingWhenNoRecords [
 	result := self endpoint graphQuery: self graphName cypher: 'CREATE (:Foo)'.
 	result recordsDo: [ :record | self fail ]
 ]
+
+{ #category : 'tests - printing' }
+FkQueryResultTest >> testPrintStringShowsHeaderAndPluralRecordCount [
+	| result |
+	result := FkQueryResult new
+		setHeader: #('name' 'address')
+		records: #(#('Alice' 'Tokyo') #('Bob' 'Osaka') #('Carol' 'Kyoto'))
+		statistics: #().
+	self assert: result printString equals: 'a FkQueryResult(#(''name'' ''address''), 3 records)'
+]
+
+{ #category : 'tests - printing' }
+FkQueryResultTest >> testPrintStringQuotesColumnNamesContainingSpaces [
+	| result |
+	result := FkQueryResult new
+		setHeader: #('first name')
+		records: #()
+		statistics: #().
+	self assert: result printString equals: 'a FkQueryResult(#(''first name''), 0 records)'
+]
+
+{ #category : 'tests - printing' }
+FkQueryResultTest >> testPrintStringShowsSingularRecordForOneRecord [
+	| result |
+	result := FkQueryResult new
+		setHeader: #('count')
+		records: #(#(42))
+		statistics: #().
+	self assert: result printString equals: 'a FkQueryResult(#(''count''), 1 record)'
+]
+
+{ #category : 'tests - printing' }
+FkQueryResultTest >> testPrintStringShowsZeroRecordsForEmptyResult [
+	self assert: FkQueryResult empty printString equals: 'a FkQueryResult(#(), 0 records)'
+]
+
+{ #category : 'tests - printing' }
+FkQueryResultTest >> testPrintStringToleratesNilHeaderAndRecords [
+	self assert: FkQueryResult new printString equals: 'a FkQueryResult(#(), 0 records)'
+]

@@ -311,6 +311,21 @@ FkQueryResult >> oneValueIfNone: noneBlock [
 	^ self oneValueDo: [ :value | value ] ifNone: noneBlock
 ]
 
+{ #category : 'printing' }
+FkQueryResult >> printOn: aStream [
+	"Header and records may still be nil on a freshly created instance; print them as empty"
+
+	| recordCount |
+	recordCount := (self records ifNil: [ #() ]) size.
+	super printOn: aStream.
+	aStream
+		nextPut: $(;
+		nextPutAll: (self header ifNil: [ #() ]) asString;
+		nextPutAll: ', ';
+		print: recordCount;
+		nextPutAll: (recordCount = 1 ifTrue: [ ' record)' ] ifFalse: [ ' records)' ])
+]
+
 { #category : 'accessing' }
 FkQueryResult >> records [
 	^ records

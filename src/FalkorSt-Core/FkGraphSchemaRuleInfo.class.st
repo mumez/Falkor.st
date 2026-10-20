@@ -48,6 +48,15 @@ FkGraphSchemaRuleInfo >> label [
 	^ self valueAt: 'label'
 ]
 
+{ #category : 'printing' }
+FkGraphSchemaRuleInfo >> printOn: aStream [
+	super printOn: aStream.
+	aStream
+		nextPut: $(;
+		nextPutAll: (STON toString: self rawRecord);
+		nextPut: $)
+]
+
 { #category : 'accessing' }
 FkGraphSchemaRuleInfo >> properties [
 	^ self valueAt: 'properties'

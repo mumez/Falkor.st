@@ -28,3 +28,15 @@ FkGraphIndexInfoTest >> testCollectFromQueryResultMapsEachRecord [
 FkGraphIndexInfoTest >> testCollectFromQueryResultOnEmptyResultAnswersEmpty [
 	self assert: (FkGraphIndexInfo collectFromQueryResult: FkQueryResult empty) isEmpty
 ]
+
+{ #category : 'tests - printing' }
+FkGraphIndexInfoTest >> testPrintStringShowsRawRecordAsSton [
+	| info |
+	info := FkGraphIndexInfo fromRecord: (Dictionary new at: 'label' put: 'Person'; yourself).
+	self assert: info printString equals: 'a FkGraphIndexInfo({''label'':''Person''})'
+]
+
+{ #category : 'tests - printing' }
+FkGraphIndexInfoTest >> testPrintStringToleratesNilRawRecord [
+	self assert: FkGraphIndexInfo new printString equals: 'a FkGraphIndexInfo(nil)'
+]
