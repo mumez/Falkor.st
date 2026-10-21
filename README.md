@@ -87,44 +87,16 @@ alice relateTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.
 `FkGraphDb named:` connects to `sync://localhost:6379` by default. See
 [Connection and Settings](#connection-and-settings) to change the connection.
 
-## High-Level API (`FkGraphDb`)
+## High-Level API
 
-### Connection and Settings
-
-`FkSettings default` holds the shared configuration. `FkGraphDb named:` uses it to create its own
-connection the first time one is needed. Each `FkGraphDb` takes a copy of these defaults the first
-time it reads its settings, so later changes to `FkSettings default` don't affect it.
-
-```smalltalk
-FkSettings default targetUrl: 'sync://falkordb.example.com:6379'.
-FkSettings default queryTimeoutMsecs: 5000. "default TIMEOUT for queries; 0 = server default"
-
-db := FkGraphDb named: 'social'.
-```
-
-To share one connection between several graphs, connect a stick yourself and pass it in:
-
-```smalltalk
-stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
-stick connect.
-
-social := FkGraphDb on: stick named: 'social'.
-movies := FkGraphDb on: stick named: 'movies'.
-```
-
-You can also give one graph its own settings, without touching the shared defaults:
-
-```smalltalk
-db := FkGraphDb named: 'social'.
-db settings queryTimeoutMsecs: 1000.
-```
+An intuitive API for working with persistent graph data.　From a named graph, you can create nodes and relationships between them. Both nodes and relationships can carry properties.
 
 ### Nodes
 
 ```smalltalk
 "Create"
 carol := db createNodeLabeled: 'Person' properties: { 'name'->'Carol'. 'age'->35 }.
-db createNodeLabeled: #('Person' 'Employee') properties: { 'name'->'Dave' }.
+dave := db createNodeLabeled: #('Person' 'Employee') properties: { 'name'->'Dave'. 'age'->18 }.
 
 "Create only if no identical node exists yet (MERGE)"
 db mergeNodeLabeled: 'Person' properties: { 'name'->'Alice'. 'age'->30 }.  "Alice already exists: answers her"
@@ -137,28 +109,34 @@ carol @ 'name'.        "'Carol' - shortcut for #propertyAt:"
 db nodeAt: carol id.   "answers nil if there is no such node"
 
 "Find"
-db nodesLabeled: 'Person'.
+people := db nodesLabeled: 'Person'.
+people collect: #name.    "#('Alice' 'Bob' 'Carol' 'Dave')"
 db nodesLabeled: 'Person' having: 'name' value: 'Alice'.
 db nodesLabeled: 'Person' havingAll: { 'name'->'Alice'. 'age'->30 }.
 db nodesLabeled: 'Person' where: [ :n | (n @ 'age') > 20 ].
-db nodesLabeled: 'Person'
+people := db nodesLabeled: 'Person'
    where: [ :n | (n @ 'age') > 20 ]
    orderBy: [ :n | (n @ 'age') asc ]
    skip: 0
    limit: 10.
-db countNodesLabeled: 'Person'.
+people collect: [:each | each properties]. 
+    "an Array(a Dictionary('age'->25 'name'->'Bob' ) a Dictionary('age'->30 'name'->'Alice' ) a Dictionary('age'->35 'name'->'Carol' ))"
+db countNodesLabeled: 'Person'. "4"
 
 "Update"
 carol propertyAt: 'age' put: 36.
+carol properties.
 carol mergeProperties: { 'city'->'Tokyo' }.             "add or overwrite some properties"
 carol properties: { 'name'->'Carol'. 'age'->36 }.       "replace all properties"
 carol removePropertyAt: 'city'.
 carol addLabel: 'Employee'.
+carol labels.
 carol removeLabel: 'Employee'.
 
 "Delete"
 carol delete.
-db deleteNodesLabeled: 'Person' where: [ :n | (n @ 'age') < 18 ].
+db deleteNodesLabeled: 'Person' where: [ :n | (n @ 'age') < 20 ].
+db countNodesLabeled: 'Person'. "2"
 ```
 
 Each mutator on a node runs right away and then reloads the node, so its local state always
@@ -177,13 +155,14 @@ follows := alice relateTo: bob typed: 'FOLLOWS'.
 knows := alice relateOneTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.  "already exists: answers it"
 
 "Create by node id"
-db createOutRelationshipTyped: 'FOLLOWS' fromNodeId: bob id toNodeId: alice id properties: #().
+db createOutRelationshipTyped: 'TEACHES' fromNodeId: bob id toNodeId: alice id properties: #().
 
 "Read and update"
 knows type.            "'KNOWS'"
 knows startNode name.  "'Alice'"
 knows endNode name.    "'Bob'"
 knows propertyAt: 'since' put: 2021.
+knows properties.      "a Dictionary('since'->2021)"
 
 "Find"
 db relationshipsTyped: 'KNOWS'.
@@ -193,7 +172,7 @@ db countRelationshipsTyped: 'KNOWS'.
 "Delete"
 follows delete.
 db deleteRelationshipsTyped: 'FOLLOWS'.
-db allRelationshipTypes.
+db allRelationshipTypes.    "#('KNOWS' 'TEACHES')"
 ```
 
 ### Traversal
@@ -206,14 +185,15 @@ alice outRelationships.              "an OrderedCollection(a FkGraphRelationship
 alice outRelationshipsTyped: 'KNOWS'. 
 alice outRelationshipsTyped: 'KNOWS' endNodeHaving: 'name' value: 'Bob'.
 alice inRelationshipsTyped: 'KNOWS'. "an OrderedCollection()"
+alice inRelationships.               "an OrderedCollection(a FkGraphRelationship(id:1))"
 alice relationshipsTyped: 'KNOWS' where: [ :s :r :e | (r @ 'since') > 2019 ].
 
 alice existsOutRelationshipTyped: 'KNOWS'.  "true"
-alice types.                                "a Set('KNOWS')"
+alice types.                                "a Set('TEACHES' 'KNOWS')"
 
 "Whole one-hop paths (FkGraphPath: startNode, relationships, endNode)"
 (alice outOneHopPathsTyped: 'KNOWS' where: [ :s :r :e | (e @ 'age') < 30 ])
-   collect: [ :path | path endNode name ].  "an OrderedCollection('Bob')"
+   collect: [ :path | path endNode name ].  "#('Bob')"
 ```
 
 When you need full control over the query, `FkGraphDb` exposes the underlying query directly:
@@ -228,7 +208,7 @@ db
    havingAll: #()
    whereIn: [ :s :r :e | nil ]
    returning: [ :path | path endNode propertyAt: 'name' ].
-"an OrderedCollection('Bob')"
+"#('Bob')"
 ```
 
 ### Running Cypher
@@ -246,12 +226,13 @@ result records. "#(#('Alice' 30) #('Bob' 25))"
 
 "GRAPH.RO_QUERY - rejected by the server if the query tries to write"
 result := db runReadOnlyCypher: 'MATCH (p:Person) RETURN count(p)'.
-result oneValue. "3"
+result oneValue. "2"
 
 "Override the query timeout (milliseconds) for this call only"
-db runCypher: 'MATCH (a)-[*]->(b) RETURN count(b)'
-   arguments: Dictionary new
+result := db runCypher: 'MATCH (a) RETURN count(a)'
+   arguments: {}
    timeout: 1000.
+result oneValue.  "2"
 ```
 
 Queries can also be built with SCypher. Any `CyQuery` is accepted wherever a Cypher string is:
@@ -276,14 +257,14 @@ result firstColumnValues. "#('Alice' 'Bob')"
 result := db runCypher: 'MATCH (p:Person) RETURN p.name AS name, p.age AS age'.
 
 result header.             "#('name' 'age')"
-result records.            "#(#('Alice' 30) #('Bob' 25) #('Dave' nil)) - rows: each an Array of values"
+result records.            "#(#('Alice' 30) #('Bob' 25)) - rows: each an Array of values"
 result mappedRecords.      "an Array(a Dictionary('age'->30 'name'->'Alice' ) a Dictionary('age'->25
-'name'->'Bob' ) a Dictionary('age'->nil 'name'->'Dave' )) - rows as column name -> value Dictionaries"
-result valuesAt: 'name'.   "#('Alice' 'Bob' 'Dave') - all values of 'name' column"
-result firstColumnValues.  "#('Alice' 'Bob' 'Dave') - all values of the first column"
+'name'->'Bob' )) - rows as column name -> value Dictionaries"
+result valuesAt: 'name'.   "#('Alice' 'Bob') - all values of 'name' column"
+result firstColumnValues.  "#('Alice' 'Bob') - all values of the first column"
 result statistics.         "e.g. 'Nodes created: 1', 'Query internal execution time: ...'"
 
-(db runCypher: 'MATCH (p:Person) RETURN count(p)') oneValue.  "3 - a single value, or nil"
+(db runCypher: 'MATCH (p:Person) RETURN count(p)') oneValueDo: [:val | val inspect].  "Safe accessor - evaluate block only when the value is available"
 ```
 
 Values are decoded as follows:
@@ -319,7 +300,7 @@ db dropIndexBy: [ :i | i range; node: 'Person'; props: #('name') ].
 ```
 
 If a required part (kind, entity, or properties, plus `dimension:` for a vector index) is missing,
-an `RsError` is signaled before anything is sent to the server.
+an `RsError invalidArguments` is signaled before anything is sent to the server.
 
 ### Constraints
 
@@ -355,7 +336,7 @@ Arguments are bound as query parameters, never inlined into the Cypher string.
 ```smalltalk
 "Execution plan, without running the query (GRAPH.EXPLAIN)"
 db explain: 'MATCH (p:Person) WHERE p.age > $minAge RETURN p'
-   arguments: { 'minAge'->20 } asDictionary.
+   arguments: { 'minAge'->20 }.
 
 "Run the query and report per-operation records and timings (GRAPH.PROFILE)"
 db profile: 'MATCH (p:Person) RETURN p'.
@@ -381,17 +362,48 @@ db allRelationshipTypes.
 db allPropertyKeys.
 db orphanedNodes.          "nodes with no relationships"
 
+(FkGraphDb named: 'social-backup') drop.
 backup := db copyTo: 'social-backup'.   "answers an FkGraphDb for the copy"
 
 db deleteAll.   "delete all nodes and relationships; indexes and constraints remain"
 db drop.        "delete the whole graph, including indexes and constraints"
 ```
 
-## Low-Level API (`FkGraphEndpoint`)
+### Connection and Settings
+
+`FkSettings default` holds the shared configuration. `FkGraphDb named:` uses it to create its own
+connection the first time one is needed. Each `FkGraphDb` takes a copy of these defaults the first
+time it reads its settings, so later changes to `FkSettings default` don't affect it.
+
+```smalltalk
+FkSettings default targetUrl: 'sync://falkordb.example.com:6379'.
+FkSettings default queryTimeoutMsecs: 5000. "default TIMEOUT for queries; 0 = server default"
+
+db := FkGraphDb named: 'social'.
+```
+
+To share one connection between several graphs, connect a stick yourself and pass it in:
+
+```smalltalk
+stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
+stick connect.
+
+social := FkGraphDb on: stick named: 'social'.
+movies := FkGraphDb on: stick named: 'movies'.
+```
+
+You can also give one graph its own settings, without touching the shared defaults:
+
+```smalltalk
+db := FkGraphDb named: 'social'.
+db settings queryTimeoutMsecs: 1000.
+```
+
+## Low-Level API
 
 `FkGraphEndpoint` maps directly onto FalkorDB's
 [commands](https://docs.falkordb.com/commands/). Use it for server-wide commands, or when you
-want to work with graph names directly.
+want to work with underlying commands directly.
 
 ```smalltalk
 stick := FkFalkorStick targetUrl: 'sync://localhost:6379'.
@@ -399,11 +411,11 @@ stick connect.
 endpoint := stick endpoint.
 
 result := endpoint graphQuery: 'social' cypher: 'CREATE (p:Person {name: ''Alice''}) RETURN p'.
-result records first first.   "an FkNode"
+result oneValue.   "an FkNode"
 
 endpoint graphQuery: 'social'
    cypher: 'MATCH (p:Person {name: $name}) RETURN p'
-   params: { 'name'->'Alice' } asDictionary.
+   params: { 'name'->'Alice' }.
 endpoint graphRoQuery: 'social' cypher: 'MATCH (p) RETURN count(p)'.
 
 ```
@@ -415,7 +427,7 @@ endpoint := db endpoint. "or `stick endpoint`"
 endpoint graphList.                                   "all graph names"
 endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
 endpoint graphConfigGetAll.
-endpoint graphConfigSet: { 'TIMEOUT_DEFAULT'->5000 } asDictionary.
+endpoint graphConfigSet: { 'TIMEOUT_DEFAULT'->5000 }.
 endpoint graphInfo.
 endpoint graphInfo: [ :opts | opts showRunningQueries; showWaitingQueries ].
 ```
@@ -455,6 +467,17 @@ the same tests with [smalltalkCI](https://github.com/hpi-swa/smalltalkCI) agains
 [docs/Performance.md](docs/Performance.md) compares `FkGraphDb` with Neo4reSt's `N4GraphDb`
 (Neo4j). It covers load and CRUD latency/throughput and container memory, and explains how to
 reproduce the numbers with the opt-in `Benchmarks` group.
+
+In short, FalkorDB is much lighter than Neo4j and faster in most operations:
+
+- **Writes** (create/update/delete) took about 0.9–2.1 ms per call, vs 4.6–12.9 ms on Neo4j. Bulk
+  loading 150,000 entities was about 7× faster (175 s vs 1,285 s).
+- **Reads** (lookup by id or indexed property, count, 1-hop traversal) were about 1.3–3.6× faster.
+  The only exception was an unindexed filter with `LIMIT`, where Neo4j won.
+- **Memory**: the FalkorDB container used about 75 MiB when empty, vs about 1.5 GiB for Neo4j
+  (with its JVM heap and page cache settings).
+
+These are results from a single machine. See the page for the environment and caveats.
 
 ## License
 

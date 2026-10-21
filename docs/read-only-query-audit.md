@@ -45,7 +45,7 @@ graphIndexes: graphName
 Decision. This is the recommended approach, checked against the code. It was revised after PR #49
 review so that the procedure names and the read-only CALL live only in Core:
 
-1. **Core: share the mapping.** A new abstract superclass `FkGraphProcedureRowInfo` holds the raw
+1. **Core: share the mapping.** A new abstract superclass `FkGraphSchemaRuleInfo` holds the raw
    record, `class >> fromRecord:` / `class >> collectFromQueryResult:` and the shared
    `label` / `entityType` / `properties` / `status` accessors. `FkGraphIndexInfo` and
    `FkGraphConstraintInfo` subclass it and keep only their column-specific accessors.

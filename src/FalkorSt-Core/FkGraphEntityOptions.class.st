@@ -69,6 +69,11 @@ FkGraphEntityOptions >> node: aLabel [
 	^ self
 ]
 
+{ #category : 'building' }
+FkGraphEntityOptions >> label: aLabel [
+	^ self node: aLabel
+]
+
 { #category : 'accessing' }
 FkGraphEntityOptions >> properties [
 	^ properties

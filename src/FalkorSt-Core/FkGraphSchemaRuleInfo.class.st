@@ -1,10 +1,10 @@
 "
-I am the abstract superclass of one row of a FalkorDB listing procedure such as CALL db.indexes()
-or CALL db.constraints(). I wrap the raw mapped record and expose the columns every such listing
-shares; subclasses add their procedure-specific accessors. I never talk to FalkorDB myself.
+I am the abstract superclass of one schema rule (an index or a constraint) as listed by
+CALL db.indexes() or CALL db.constraints(). I wrap the raw mapped record and expose the columns
+both listings share; subclasses add their rule-specific accessors. I never talk to FalkorDB myself.
 
 Responsibility:
-- Build instances from a procedure's FkQueryResult, one per record
+- Build instances from a db.indexes() / db.constraints() FkQueryResult, one per record
 - Retain the raw mapped record so a missing or renamed key is still inspectable rather than
   silently lost behind a nil accessor
 - Expose the shared #label / #entityType / #properties / #status columns
@@ -17,7 +17,7 @@ Public API and Key Messages:
 - #label / #entityType / #properties / #status
 "
 Class {
-	#name : 'FkGraphProcedureRowInfo',
+	#name : 'FkGraphSchemaRuleInfo',
 	#superclass : 'Object',
 	#instVars : [
 		'rawRecord'
@@ -27,48 +27,57 @@ Class {
 }
 
 { #category : 'instance creation' }
-FkGraphProcedureRowInfo class >> collectFromQueryResult: aFkQueryResult [
+FkGraphSchemaRuleInfo class >> collectFromQueryResult: aFkQueryResult [
 	^ (aFkQueryResult mappedRecords collect: [ :record | self fromRecord: record ]) asArray
 ]
 
 { #category : 'instance creation' }
-FkGraphProcedureRowInfo class >> fromRecord: aDictionary [
+FkGraphSchemaRuleInfo class >> fromRecord: aDictionary [
 	^ self new
 		rawRecord: aDictionary;
 		yourself
 ]
 
 { #category : 'accessing' }
-FkGraphProcedureRowInfo >> entityType [
+FkGraphSchemaRuleInfo >> entityType [
 	^ self valueAt: 'entitytype'
 ]
 
 { #category : 'accessing' }
-FkGraphProcedureRowInfo >> label [
+FkGraphSchemaRuleInfo >> label [
 	^ self valueAt: 'label'
 ]
 
+{ #category : 'printing' }
+FkGraphSchemaRuleInfo >> printOn: aStream [
+	super printOn: aStream.
+	aStream
+		nextPut: $(;
+		nextPutAll: (STON toString: self rawRecord);
+		nextPut: $)
+]
+
 { #category : 'accessing' }
-FkGraphProcedureRowInfo >> properties [
+FkGraphSchemaRuleInfo >> properties [
 	^ self valueAt: 'properties'
 ]
 
 { #category : 'accessing' }
-FkGraphProcedureRowInfo >> status [
+FkGraphSchemaRuleInfo >> status [
 	^ self valueAt: 'status'
 ]
 
 { #category : 'private-accessing' }
-FkGraphProcedureRowInfo >> rawRecord [
+FkGraphSchemaRuleInfo >> rawRecord [
 	^ rawRecord
 ]
 
 { #category : 'private-accessing' }
-FkGraphProcedureRowInfo >> rawRecord: aDictionary [
+FkGraphSchemaRuleInfo >> rawRecord: aDictionary [
 	rawRecord := aDictionary
 ]
 
 { #category : 'private-accessing' }
-FkGraphProcedureRowInfo >> valueAt: columnName [
+FkGraphSchemaRuleInfo >> valueAt: columnName [
 	^ self rawRecord at: columnName ifAbsent: [ nil ]
 ]

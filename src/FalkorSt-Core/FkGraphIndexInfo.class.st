@@ -8,14 +8,14 @@ Responsibility:
   my superclass exposes
 
 Collaborators:
-- FkGraphProcedureRowInfo: my superclass, which builds me from a db.indexes() result
+- FkGraphSchemaRuleInfo: my superclass, which builds me from a db.indexes() result
 
 Public API and Key Messages:
 - #label / #properties / #types / #options / #language / #stopwords / #entityType / #status
 "
 Class {
 	#name : 'FkGraphIndexInfo',
-	#superclass : 'FkGraphProcedureRowInfo',
+	#superclass : 'FkGraphSchemaRuleInfo',
 	#category : 'FalkorSt-Core',
 	#package : 'FalkorSt-Core'
 }
