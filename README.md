@@ -155,13 +155,14 @@ follows := alice relateTo: bob typed: 'FOLLOWS'.
 knows := alice relateOneTo: bob typed: 'KNOWS' properties: { 'since'->2020 }.  "already exists: answers it"
 
 "Create by node id"
-db createOutRelationshipTyped: 'FOLLOWS' fromNodeId: bob id toNodeId: alice id properties: #().
+db createOutRelationshipTyped: 'TEACHES' fromNodeId: bob id toNodeId: alice id properties: #().
 
 "Read and update"
 knows type.            "'KNOWS'"
 knows startNode name.  "'Alice'"
 knows endNode name.    "'Bob'"
 knows propertyAt: 'since' put: 2021.
+knows properties.      "a Dictionary('since'->2021)"
 
 "Find"
 db relationshipsTyped: 'KNOWS'.
@@ -171,7 +172,7 @@ db countRelationshipsTyped: 'KNOWS'.
 "Delete"
 follows delete.
 db deleteRelationshipsTyped: 'FOLLOWS'.
-db allRelationshipTypes.
+db allRelationshipTypes.    "#('KNOWS' 'TEACHES')"
 ```
 
 ### Traversal
@@ -184,14 +185,15 @@ alice outRelationships.              "an OrderedCollection(a FkGraphRelationship
 alice outRelationshipsTyped: 'KNOWS'. 
 alice outRelationshipsTyped: 'KNOWS' endNodeHaving: 'name' value: 'Bob'.
 alice inRelationshipsTyped: 'KNOWS'. "an OrderedCollection()"
+alice inRelationships.               "an OrderedCollection(a FkGraphRelationship(id:1))"
 alice relationshipsTyped: 'KNOWS' where: [ :s :r :e | (r @ 'since') > 2019 ].
 
 alice existsOutRelationshipTyped: 'KNOWS'.  "true"
-alice types.                                "a Set('KNOWS')"
+alice types.                                "a Set('TEACHES' 'KNOWS')"
 
 "Whole one-hop paths (FkGraphPath: startNode, relationships, endNode)"
 (alice outOneHopPathsTyped: 'KNOWS' where: [ :s :r :e | (e @ 'age') < 30 ])
-   collect: [ :path | path endNode name ].  "an OrderedCollection('Bob')"
+   collect: [ :path | path endNode name ].  "#('Bob')"
 ```
 
 When you need full control over the query, `FkGraphDb` exposes the underlying query directly:
@@ -206,7 +208,7 @@ db
    havingAll: #()
    whereIn: [ :s :r :e | nil ]
    returning: [ :path | path endNode propertyAt: 'name' ].
-"an OrderedCollection('Bob')"
+"#('Bob')"
 ```
 
 ### Running Cypher
@@ -224,12 +226,13 @@ result records. "#(#('Alice' 30) #('Bob' 25))"
 
 "GRAPH.RO_QUERY - rejected by the server if the query tries to write"
 result := db runReadOnlyCypher: 'MATCH (p:Person) RETURN count(p)'.
-result oneValue. "3"
+result oneValue. "2"
 
 "Override the query timeout (milliseconds) for this call only"
-db runCypher: 'MATCH (a)-[*]->(b) RETURN count(b)'
-   arguments: Dictionary new
+result := db runCypher: 'MATCH (a) RETURN count(a)'
+   arguments: {}
    timeout: 1000.
+result oneValue.  "2"
 ```
 
 Queries can also be built with SCypher. Any `CyQuery` is accepted wherever a Cypher string is:
@@ -254,14 +257,14 @@ result firstColumnValues. "#('Alice' 'Bob')"
 result := db runCypher: 'MATCH (p:Person) RETURN p.name AS name, p.age AS age'.
 
 result header.             "#('name' 'age')"
-result records.            "#(#('Alice' 30) #('Bob' 25) #('Dave' nil)) - rows: each an Array of values"
+result records.            "#(#('Alice' 30) #('Bob' 25)) - rows: each an Array of values"
 result mappedRecords.      "an Array(a Dictionary('age'->30 'name'->'Alice' ) a Dictionary('age'->25
-'name'->'Bob' ) a Dictionary('age'->nil 'name'->'Dave' )) - rows as column name -> value Dictionaries"
-result valuesAt: 'name'.   "#('Alice' 'Bob' 'Dave') - all values of 'name' column"
-result firstColumnValues.  "#('Alice' 'Bob' 'Dave') - all values of the first column"
+'name'->'Bob' )) - rows as column name -> value Dictionaries"
+result valuesAt: 'name'.   "#('Alice' 'Bob') - all values of 'name' column"
+result firstColumnValues.  "#('Alice' 'Bob') - all values of the first column"
 result statistics.         "e.g. 'Nodes created: 1', 'Query internal execution time: ...'"
 
-(db runCypher: 'MATCH (p:Person) RETURN count(p)') oneValue.  "3 - a single value, or nil"
+(db runCypher: 'MATCH (p:Person) RETURN count(p)') oneValueDo: [:val | val inspect].  "Safe accessor - evaluate block only when the value is available"
 ```
 
 Values are decoded as follows:
@@ -359,6 +362,7 @@ db allRelationshipTypes.
 db allPropertyKeys.
 db orphanedNodes.          "nodes with no relationships"
 
+(FkGraphDb named: 'social-backup') drop.
 backup := db copyTo: 'social-backup'.   "answers an FkGraphDb for the copy"
 
 db deleteAll.   "delete all nodes and relationships; indexes and constraints remain"
