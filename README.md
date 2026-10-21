@@ -323,9 +323,19 @@ validated (or `'FAILED'` if the data violates it).
 
 ### Procedures
 
+FalkorDB's built-in [procedures](https://docs.falkordb.com/cypher/procedures) (schema introspection,
+full-text/vector index queries, graph algorithms such as `algo.BFS` or `algo.pageRank`, ...) can be
+invoked via `CALL`. Use `callReadOnlyProcedure:` for procedures that do not modify the graph
+(sent as `GRAPH.RO_QUERY`).
+
 ```smalltalk
+"List all node labels"
 db callReadOnlyProcedure: 'db.labels'.
+
+"Full-text search on Article nodes for 'graph'"
 db callProcedure: 'db.idx.fulltext.queryNodes' arguments: #('Article' 'graph').
+
+"Return only the selected output columns (YIELD)"
 db callReadOnlyProcedure: 'db.indexes' arguments: #() yield: #('label' 'properties').
 ```
 
