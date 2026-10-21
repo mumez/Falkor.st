@@ -427,7 +427,7 @@ endpoint := db endpoint. "or `stick endpoint`"
 endpoint graphList.                                   "all graph names"
 endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
 endpoint graphConfigGetAll.
-endpoint graphConfigSet: { 'TIMEOUT_DEFAULT'->5000 } asDictionary.
+endpoint graphConfigSet: { 'TIMEOUT_DEFAULT'->5000 }.
 endpoint graphInfo.
 endpoint graphInfo: [ :opts | opts showRunningQueries; showWaitingQueries ].
 ```

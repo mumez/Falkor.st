@@ -67,7 +67,8 @@ Public API and Key Messages:
 - #graphConfigGet: - query one runtime config parameter, or all of them when passed '*',
   answering the raw reply
 - #graphConfigGetAll - shortcut for #graphConfigGet: '*', answering all runtime config parameters
-- #graphConfigSet: - set one or more runtime config parameters from a Dictionary (not persisted
+- #graphConfigSet: - set one or more runtime config parameters from a Dictionary or a collection of
+  Associations, e.g. { 'TIMEOUT_DEFAULT' -> 5000 } (not persisted
   across a server restart), answering the raw reply
 - #graphConstraintCreate:type:entityType:entityName:properties: - create a MANDATORY or UNIQUE
   schema constraint on a NODE label or RELATIONSHIP type's properties, answering the raw reply
@@ -208,10 +209,10 @@ FkGraphEndpoint >> graphConfigGetAll [
 ]
 
 { #category : 'commands-graph' }
-FkGraphEndpoint >> graphConfigSet: paramsDictionary [
+FkGraphEndpoint >> graphConfigSet: paramsDictionaryOrAssociations [
 	| args |
 	args := OrderedCollection with: 'GRAPH.CONFIG' with: 'SET'.
-	paramsDictionary keysAndValuesDo: [ :key :value |
+	paramsDictionaryOrAssociations asDictionary keysAndValuesDo: [ :key :value |
 		args add: key; add: value ].
 	^ self unifiedCommand: args
 ]

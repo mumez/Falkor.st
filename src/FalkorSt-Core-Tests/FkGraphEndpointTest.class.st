@@ -258,6 +258,17 @@ FkGraphEndpointTest >> testGraphConfigSetUpdatesParamValue [
 				graphConfigSet: (Dictionary new at: 'TIMEOUT_DEFAULT' put: originalValue; yourself) ]
 ]
 
+{ #category : 'tests' }
+FkGraphEndpointTest >> testGraphConfigSetAcceptsAssociations [
+	| reply originalValue |
+	originalValue := (self endpoint graphConfigGet: 'TIMEOUT_DEFAULT') second.
+	[
+		self endpoint graphConfigSet: { 'TIMEOUT_DEFAULT' -> 5000 }.
+		reply := self endpoint graphConfigGet: 'TIMEOUT_DEFAULT'.
+		self assert: reply second equals: 5000 ]
+		ensure: [ self endpoint graphConfigSet: { 'TIMEOUT_DEFAULT' -> originalValue } ]
+]
+
 { #category : 'private' }
 FkGraphEndpointTest >> createConstraintType: constraintType entityType: entityType entityName: entityName properties: propertiesCollection [
 	^ self endpoint
